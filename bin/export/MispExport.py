@@ -43,11 +43,15 @@ from pymisp import MISPEvent, MISPObject, PyMISP
 def is_valid_obj_to_export(obj_type, obj_subtype, obj_id):
     if not Correlate_object.is_valid_object_type(obj_type):
         return False
-    if not Correlate_object.is_valid_object_subtype(obj_type, obj_subtype):
-        return False
-    if not Correlate_object.exist_object(obj_type, obj_id, type_id=obj_subtype):
-        return False
-    return True
+    return (
+        bool(
+            Correlate_object.exist_object(
+                obj_type, obj_id, type_id=obj_subtype
+            )
+        )
+        if Correlate_object.is_valid_object_subtype(obj_type, obj_subtype)
+        else False
+    )
 
 def sanitize_obj_export_lvl(lvl):
     try:
@@ -57,7 +61,7 @@ def sanitize_obj_export_lvl(lvl):
     return lvl
 
 def get_export_filename(json_content):
-    return 'ail_export_{}.json'.format(json_content.uuid)
+    return f'ail_export_{json_content.uuid}.json'
 
 def create_in_memory_file(json_content):
     return io.BytesIO(json_content.encode())
@@ -78,8 +82,7 @@ def export_ail_item(item_id, tags=[]):
     obj = MISPObject('ail-leak', standalone=True)
     obj.first_seen = dict_metadata['date']
 
-    l_obj_attr = []
-    l_obj_attr.append( obj.add_attribute('first-seen', value=dict_metadata['date']) )
+    l_obj_attr = [obj.add_attribute('first-seen', value=dict_metadata['date'])]
     l_obj_attr.append( obj.add_attribute('raw-data', value=item_id, data=dict_metadata['raw_content']) )
     l_obj_attr.append( obj.add_attribute('sensor', value=Export.get_ail_uuid()) )
 
@@ -97,8 +100,7 @@ def export_domain(domain):
     obj.first_seen = dict_metadata['first_seen']
     obj.last_seen = dict_metadata['last_check']
 
-    l_obj_attr = []
-    l_obj_attr.append( obj.add_attribute('domain', value=domain) )
+    l_obj_attr = [obj.add_attribute('domain', value=domain)]
     dict_all_url = Domain.get_domain_all_url(domain, domain_obj.get_domain_type())
     for crawled_url in dict_all_url:
         attribute = obj.add_attribute('url', value=crawled_url)
@@ -122,8 +124,7 @@ def export_decoded(sha1_string):
     obj.first_seen = decoded_metadata['first_seen']
     obj.last_seen = decoded_metadata['last_seen']
 
-    l_obj_attr = []
-    l_obj_attr.append( obj.add_attribute('sha1', value=sha1_string) )
+    l_obj_attr = [obj.add_attribute('sha1', value=sha1_string)]
     l_obj_attr.append( obj.add_attribute('mimetype', value=Decoded.get_decoded_item_type(sha1_string)) )
     l_obj_attr.append( obj.add_attribute('malware-sample', value=sha1_string, data=Decoded.get_decoded_file_content(sha1_string)) )
 
@@ -137,13 +138,10 @@ def export_decoded(sha1_string):
 def export_screenshot(sha256_string):
     obj = MISPObject('file')
 
-    l_obj_attr = []
-    l_obj_attr.append( obj.add_attribute('sha256', value=sha256_string) )
+    l_obj_attr = [obj.add_attribute('sha256', value=sha256_string)]
     l_obj_attr.append( obj.add_attribute('attachment', value=sha256_string, data=Screenshot.get_screenshot_file_content(sha256_string)) )
 
-    # add tags
-    tags = Screenshot.get_screenshot_tags(sha256_string)
-    if tags:
+    if tags := Screenshot.get_screenshot_tags(sha256_string):
         tag_misp_object_attributes(l_obj_attr, tags)
 
     return obj
@@ -156,10 +154,8 @@ def export_cryptocurrency(crypto_type, crypto_address):
     obj.first_seen = dict_metadata['first_seen']
     obj.last_seen = dict_metadata['last_seen']
 
-    l_obj_attr = []
-    l_obj_attr.append( obj.add_attribute('address', value=crypto_address) )
-    crypto_symbol = Cryptocurrency.get_cryptocurrency_symbol(crypto_type)
-    if crypto_symbol:
+    l_obj_attr = [obj.add_attribute('address', value=crypto_address)]
+    if crypto_symbol := Cryptocurrency.get_cryptocurrency_symbol(crypto_type):
         l_obj_attr.append( obj.add_attribute('symbol', value=crypto_symbol) )
 
     return obj
@@ -238,7 +234,7 @@ def add_obj_to_create_by_lvl(all_obj_to_export, set_relationship, dict_obj, lvl)
         obj_correlations = Correlate_object.get_object_correlation(dict_obj['type'], dict_obj['id'], requested_correl_type=dict_obj.get('subtype', None))
         for obj_type in obj_correlations:
             dict_new_obj = {'type': obj_type}
-            if obj_type=='pgp' or obj_type=='cryptocurrency' or obj_type=='username':
+            if obj_type in ['pgp', 'cryptocurrency', 'username']:
                 for subtype in obj_correlations[obj_type]:
                     dict_new_obj['subtype'] = subtype
                     for obj_id in obj_correlations[obj_type][subtype]:
@@ -267,8 +263,9 @@ def create_list_of_objs_to_export(l_obj, r_type='json'):
 
     # create object relationships
     for obj_global_id_1, obj_global_id_2 in set_relationship:
-        dict_relationship = get_relationship_between_global_obj(obj_global_id_1, obj_global_id_2)
-        if dict_relationship:
+        if dict_relationship := get_relationship_between_global_obj(
+            obj_global_id_1, obj_global_id_2
+        ):
             obj_src = dict_misp_obj[dict_relationship['src']]
             obj_dest = dict_misp_obj[dict_relationship['dest']]
             obj_src.add_reference(obj_dest.uuid, dict_relationship['relation'], 'add a comment')
@@ -342,7 +339,7 @@ def get_relationship_between_global_obj(obj_global_id_1, obj_global_id_2):
             src = obj_global_id_2
             dest = obj_global_id_1
         return {'relation': 'extracted-from', 'src': src, 'dest': dest}
-    elif 'cryptocurrency':
+    else:
         if obj_type_1 == 'cryptocurrency':
             src = obj_global_id_1
             dest = obj_global_id_2
@@ -350,53 +347,26 @@ def get_relationship_between_global_obj(obj_global_id_1, obj_global_id_2):
             src = obj_global_id_2
             dest = obj_global_id_1
         return {'relation': 'extracted-from', 'src': src, 'dest': dest}
-    elif 'domain' in type_tuple:
-        if 'item' in type_tuple:
-            if obj_type_1 == 'item':
-                src = obj_global_id_1
-                dest = obj_global_id_2
-            else:
-                src = obj_global_id_2
-                dest = obj_global_id_1
-            return {'relation': 'extracted-from', 'src': src, 'dest': dest} # replave by crawled-from
-    elif 'item' in type_tuple:
-        if 'domain' in type_tuple:
-            if obj_type_1 == 'item':
-                src = obj_global_id_1
-                dest = obj_global_id_2
-            else:
-                src = obj_global_id_2
-                dest = obj_global_id_1
-            return {'relation': 'extracted-from', 'src': src, 'dest': dest} # replave by crawled-from
     return None
 
 def sanitize_event_distribution(distribution):
     try:
         int(distribution)
-        if (0 <= distribution <= 3):
-            return distribution
-        else:
-            return 0
+        return distribution if (0 <= distribution <= 3) else 0
     except:
         return 0
 
 def sanitize_event_threat_level_id(threat_level_id):
     try:
         int(threat_level_id)
-        if (1 <= threat_level_id <= 4):
-            return threat_level_id
-        else:
-            return 4
+        return threat_level_id if (1 <= threat_level_id <= 4) else 4
     except:
         return 4
 
 def sanitize_event_analysis(analysis):
     try:
         int(analysis)
-        if (0 <= analysis <= 2):
-            return analysis
-        else:
-            return 0
+        return analysis if (0 <= analysis <= 2) else 0
     except:
         return 0
 
@@ -423,19 +393,14 @@ def create_misp_event(event, distribution=0, threat_level_id=4, publish=False, a
     #print(event.to_json())
 
     misp_event = misp.add_event(event)
-     #print(misp_event)
-    # # TODO: handle error
-    event_metadata = extract_event_metadata(misp_event)
-    return event_metadata
+    return extract_event_metadata(misp_event)
 
 def extract_event_metadata(event):
-    event_metadata = {}
-    event_metadata['uuid'] = event['Event']['uuid']
-    event_metadata['id'] = event['Event']['id']
+    event_metadata = {'uuid': event['Event']['uuid'], 'id': event['Event']['id']}
     if misp_url[-1] == '/':
-        event_metadata['url'] = misp_url + 'events/view/' + str(event_metadata['id'])
+        event_metadata['url'] = f'{misp_url}events/view/' + str(event_metadata['id'])
     else:
-        event_metadata['url'] = misp_url + '/events/view/' + str(event_metadata['id'])
+        event_metadata['url'] = f'{misp_url}/events/view/' + str(event_metadata['id'])
     return event_metadata
 
 ######
@@ -466,12 +431,8 @@ def create_investigation_event(investigation_uuid):
     investigation_objs = investigation.get_objects()
     for obj in investigation_objs:
         # if subtype -> obj_id = 'subtype:type'
-        if obj['subtype']:
-            obj_id = f"{obj['subtype']}:{obj['id']}"
-        else:
-            obj_id = obj['id']
-        misp_obj = create_misp_obj(obj['type'], obj_id)
-        if misp_obj:
+        obj_id = f"{obj['subtype']}:{obj['id']}" if obj['subtype'] else obj['id']
+        if misp_obj := create_misp_obj(obj['type'], obj_id):
             event.add_object(misp_obj)
 
     # if publish:
@@ -487,10 +448,7 @@ def create_investigation_event(investigation_uuid):
     # # TODO: handle error
     event_metadata = extract_event_metadata(misp_event)
     if event_metadata.get('uuid'):
-        if misp_url[-1] == '/':
-            url =  misp_url[:-1]
-        else:
-            url =  misp_url
+        url = misp_url[:-1] if misp_url[-1] == '/' else misp_url
         investigation.add_misp_events(url)
     return event_metadata
 

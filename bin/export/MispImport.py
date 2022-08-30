@@ -26,22 +26,20 @@ from pymisp import MISPEvent, MISPObject, PyMISP
 # # TODO: deplace me in another fil
 def get_global_id(obj_type, obj_id, obj_subtype=None):
     if obj_subtype:
-        return '{}:{}:{}'.format(obj_type, obj_subtype, obj_id)
+        return f'{obj_type}:{obj_subtype}:{obj_id}'
     else:
-        return '{}:{}'.format(obj_type, obj_id)
+        return f'{obj_type}:{obj_id}'
 
 # sub type
 # obj type
 # obj value
 def get_global_id_from_id(global_id):
-    obj_meta = {}
     global_id = global_id.split(':', 3)
+    obj_meta = {'type': global_id[0]}
     if len(global_id) > 2:
-        obj_meta['type'] = global_id[0]
         obj_meta['subtype'] = global_id[1]
         obj_meta['id'] = global_id[2]
     else:
-        obj_meta['type'] = global_id[0]
         obj_meta['subtype'] = None
         obj_meta['id'] = global_id[1]
     return obj_meta
@@ -54,19 +52,17 @@ def sanitize_import_file_path(filename):
     filename = os.path.join(IMPORT_FOLDER, filename)
     filename = os.path.realpath(filename)
     # path traversal
-    if not os.path.commonprefix([filename, IMPORT_FOLDER]) == IMPORT_FOLDER:
-        return os.path.join(IMPORT_FOLDER, str(uuid.uuid4()) + '.json')
+    if os.path.commonprefix([filename, IMPORT_FOLDER]) != IMPORT_FOLDER:
+        return os.path.join(IMPORT_FOLDER, f'{str(uuid.uuid4())}.json')
     # check if file already exist
     if os.path.isfile(filename):
-        return os.path.join(IMPORT_FOLDER, str(uuid.uuid4()) + '.json')
+        return os.path.join(IMPORT_FOLDER, f'{str(uuid.uuid4())}.json')
     return filename
 
 def get_misp_obj_tag(misp_obj):
     if misp_obj.attributes:
         misp_tags = misp_obj.attributes[0].tags
-        tags = []
-        for misp_tag in misp_tags:
-            tags.append(misp_tag.name)
+        tags = [misp_tag.name for misp_tag in misp_tags]
         return tags
     else:
         return []
@@ -148,43 +144,43 @@ def get_obj_type_from_relationship(misp_obj):
 # # TODO: covert md5 and sha1 to expected
 def unpack_file(map_uuid_global_id, misp_obj):
 
-    obj_type = get_obj_type_from_relationship(misp_obj)
-    if obj_type:
-        obj_id = None
-        io_content = None
-        for attribute in misp_obj.attributes:
-            # get file content
-            if attribute.object_relation == 'attachment':
-                io_content = attribute.data
-            elif attribute.object_relation == 'malware-sample':
-                io_content = attribute.data
+    if not (obj_type := get_obj_type_from_relationship(misp_obj)):
+        return
+    obj_id = None
+    io_content = None
+    for attribute in misp_obj.attributes:
+        # get file content
+        if attribute.object_relation == 'attachment':
+            io_content = attribute.data
+        elif attribute.object_relation == 'malware-sample':
+            io_content = attribute.data
 
-            # # TODO: use/verify specified mimetype
-            elif attribute.object_relation == 'mimetype':
-                #print(attribute.value)
-                pass
+        # # TODO: use/verify specified mimetype
+        elif attribute.object_relation == 'mimetype':
+            #print(attribute.value)
+            pass
 
-            # # TODO: support more
-            elif attribute.object_relation == 'sha1' and obj_type == 'decoded':
-                obj_id = attribute.value
-            elif attribute.object_relation == 'sha256' and obj_type == 'screenshot':
-                obj_id = attribute.value
+        # # TODO: support more
+        elif attribute.object_relation == 'sha1' and obj_type == 'decoded':
+            obj_id = attribute.value
+        elif attribute.object_relation == 'sha256' and obj_type == 'screenshot':
+            obj_id = attribute.value
 
-        # get SHA1/sha256
-        if io_content and not obj_id:
-            if obj_type=='screenshot':
-                obj_id = sha256(io_content.getvalue()).hexdigest()
-            else: # decoded file
-                obj_id = sha1(io_content.getvalue()).hexdigest()
+    # get SHA1/sha256
+    if io_content and not obj_id:
+        if obj_type=='screenshot':
+            obj_id = sha256(io_content.getvalue()).hexdigest()
+        else: # decoded file
+            obj_id = sha1(io_content.getvalue()).hexdigest()
 
-        if obj_id and io_content:
-            obj_meta = get_object_metadata(misp_obj)
-            if obj_type == 'screenshot':
-                Screenshot.create_screenshot(obj_id, obj_meta, io_content)
-                map_uuid_global_id[misp_obj.uuid] = get_global_id('image', obj_id)
-            else: #decoded
-                Decoded.create_decoded(obj_id, obj_meta, io_content)
-                map_uuid_global_id[misp_obj.uuid] = get_global_id('decoded', obj_id)
+    if obj_id and io_content:
+        obj_meta = get_object_metadata(misp_obj)
+        if obj_type == 'screenshot':
+            Screenshot.create_screenshot(obj_id, obj_meta, io_content)
+            map_uuid_global_id[misp_obj.uuid] = get_global_id('image', obj_id)
+        else: #decoded
+            Decoded.create_decoded(obj_id, obj_meta, io_content)
+            map_uuid_global_id[misp_obj.uuid] = get_global_id('decoded', obj_id)
 
 
 def get_misp_import_fct(map_uuid_global_id, misp_obj):
@@ -201,20 +197,21 @@ def get_misp_import_fct(map_uuid_global_id, misp_obj):
 
 # import relationship between objects
 def create_obj_relationships(map_uuid_global_id, misp_obj):
-    if misp_obj.uuid in map_uuid_global_id:
-        for relationship in misp_obj.ObjectReference:
-            if relationship.referenced_uuid in map_uuid_global_id:
-                obj_meta_src = get_global_id_from_id(map_uuid_global_id[relationship.object_uuid])
-                obj_meta_target = get_global_id_from_id(map_uuid_global_id[relationship.referenced_uuid])
+    if misp_obj.uuid not in map_uuid_global_id:
+        return
+    for relationship in misp_obj.ObjectReference:
+        if relationship.referenced_uuid in map_uuid_global_id:
+            obj_meta_src = get_global_id_from_id(map_uuid_global_id[relationship.object_uuid])
+            obj_meta_target = get_global_id_from_id(map_uuid_global_id[relationship.referenced_uuid])
 
-                if obj_meta_src == 'decoded' or obj_meta_src == 'item':
-                    print('000000')
-                    print(obj_meta_src)
-                    print(obj_meta_target)
-                    print('111111')
+            if obj_meta_src in ['decoded', 'item']:
+                print('000000')
+                print(obj_meta_src)
+                print(obj_meta_target)
+                print('111111')
 
-                Correlate_object.create_obj_relationship(obj_meta_src['type'], obj_meta_src['id'], obj_meta_target['type'], obj_meta_target['id'],
-                                                            obj1_subtype=obj_meta_src['subtype'], obj2_subtype=obj_meta_target['subtype'])
+            Correlate_object.create_obj_relationship(obj_meta_src['type'], obj_meta_src['id'], obj_meta_target['type'], obj_meta_target['id'],
+                                                        obj1_subtype=obj_meta_src['subtype'], obj2_subtype=obj_meta_target['subtype'])
 
 def create_map_all_obj_uuid_golbal_id(map_uuid_global_id):
     for obj_uuid in map_uuid_global_id:

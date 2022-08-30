@@ -86,10 +86,11 @@ class Item(AbstractObject):
         filename = os.path.realpath(filename)
 
         # incorrect filename
-        if not os.path.commonprefix([filename, PASTES_FOLDER]) == PASTES_FOLDER:
-            return None
-        else:
-            return filename
+        return (
+            filename
+            if os.path.commonprefix([filename, PASTES_FOLDER]) == PASTES_FOLDER
+            else None
+        )
 
     def get_content(self):
         """
@@ -111,8 +112,7 @@ class Item(AbstractObject):
         return content.decode()
 
     def get_ail_2_ail_payload(self):
-        payload = {'raw': self.get_gzip_content(b64=True)}
-        return payload
+        return {'raw': self.get_gzip_content(b64=True)}
 
     # # TODO:
     def create(self):
@@ -129,17 +129,14 @@ class Item(AbstractObject):
             return False
 
     def get_link(self, flask_context=False):
-        if flask_context:
-            url = url_for('objects_item.showItem', id=self.id)
-        else:
-            url = f'{baseurl}/object/item?id={self.id}'
-        return url
+        return (
+            url_for('objects_item.showItem', id=self.id)
+            if flask_context
+            else f'{baseurl}/object/item?id={self.id}'
+        )
 
     def get_svg_icon(self):
-        if is_crawled(self.id):
-            color = 'red'
-        else:
-            color = '#332288'
+        color = 'red' if is_crawled(self.id) else '#332288'
         return {'style': '', 'icon': '', 'color': color, 'radius':5}
 
     def get_misp_object(self):
@@ -147,8 +144,7 @@ class Item(AbstractObject):
         obj = MISPObject('ail-leak', standalone=True)
         obj.first_seen = obj_date
 
-        obj_attrs = []
-        obj_attrs.append( obj.add_attribute('first-seen', value=obj_date) )
+        obj_attrs = [obj.add_attribute('first-seen', value=obj_date)]
         obj_attrs.append( obj.add_attribute('raw-data', value=self.id, data=self.get_raw_content()) )
         obj_attrs.append( obj.add_attribute('sensor', value=get_ail_uuid()) )
         for obj_attr in obj_attrs:
@@ -212,17 +208,13 @@ def get_lines_info(item_id, item_content=None):
 
 
 def get_item_metadata(item_id, item_content=None):
-    ## TODO: FIXME ##performance
-    # encoding
-    # language
-    # lines info
-    item_metadata = {'date': get_item_date(item_id, add_separator=True),
-                     'source': get_source(item_id),
-                     'size': get_item_size(item_id),
-                     'encoding': get_item_encoding(item_id),
-                     'lines': get_lines_info(item_id, item_content=item_content)
-                     }
-    return item_metadata
+    return {
+        'date': get_item_date(item_id, add_separator=True),
+        'source': get_source(item_id),
+        'size': get_item_size(item_id),
+        'encoding': get_item_encoding(item_id),
+        'lines': get_lines_info(item_id, item_content=item_content),
+    }
 
 def get_item_parent(item_id):
     return item_basic.get_item_parent(item_id)
@@ -284,9 +276,16 @@ def get_item_languages(item_id, min_len=600, num_langs=3, min_proportion=0.2, mi
     #print(content)
     #print(len(content))
     if len(content) >= min_len:
-        for lang in cld3.get_frequent_languages(content, num_langs=num_langs):
-            if lang.proportion >= min_proportion and lang.probability >= min_probability and lang.is_reliable:
-                all_languages.append(lang)
+        all_languages.extend(
+            lang
+            for lang in cld3.get_frequent_languages(
+                content, num_langs=num_langs
+            )
+            if lang.proportion >= min_proportion
+            and lang.probability >= min_probability
+            and lang.is_reliable
+        )
+
     return all_languages
 
 # API
@@ -300,33 +299,24 @@ def get_item(request_dict):
     if not exist_item(item_id):
         return {'status': 'error', 'reason': 'Item not found'}, 404
 
-    dict_item = {}
-    dict_item['id'] = item_id
-    date = request_dict.get('date', True)
-    if date:
-        add_separator = False
-        if request_dict.get('date_separator', False):
-            add_separator = True
+    dict_item = {'id': item_id}
+    if date := request_dict.get('date', True):
+        add_separator = bool(request_dict.get('date_separator', False))
         dict_item['date'] = get_item_date(item_id, add_separator=add_separator)
-    tags = request_dict.get('tags', True)
-    if tags:
+    if tags := request_dict.get('tags', True):
         dict_item['tags'] = Tag.get_obj_tag(item_id)
 
-    size = request_dict.get('size', False)
-    if size:
+    if size := request_dict.get('size', False):
         dict_item['size'] = get_item_size(item_id)
 
-    content = request_dict.get('content', False)
-    if content:
+    if content := request_dict.get('content', False):
         # UTF-8 outpout, # TODO: use base64
         dict_item['content'] = get_item_content(item_id)
 
-    raw_content = request_dict.get('raw_content', False)
-    if raw_content:
+    if raw_content := request_dict.get('raw_content', False):
         dict_item['raw_content'] = get_raw_content(item_id)
 
-    lines_info = request_dict.get('lines', False)
-    if lines_info:
+    if lines_info := request_dict.get('lines', False):
         dict_item['lines'] = get_lines_info(item_id, dict_item.get('content', 'None'))
 
     if request_dict.get('pgp'):
@@ -464,8 +454,9 @@ def get_item_all_correlation(item_id, correlation_names=[], get_nb=False):
 
 ## TODO: REFRACTOR
 def _get_item_correlation(correlation_name, correlation_type, item_id):
-    res = r_serv_metadata.smembers('item_{}_{}:{}'.format(correlation_name, correlation_type, item_id))
-    if res:
+    if res := r_serv_metadata.smembers(
+        f'item_{correlation_name}_{correlation_type}:{item_id}'
+    ):
         return list(res)
     else:
         return []
@@ -494,10 +485,14 @@ def get_item_pgp_correlation(item_id):
 ### GET Internal Module DESC
 ###
 def get_item_list_desc(list_item_id):
-    desc_list = []
-    for item_id in list_item_id:
-        desc_list.append( {'id': item_id, 'date': get_item_date(item_id), 'tags': Tag.get_obj_tag(item_id)} )
-    return desc_list
+    return [
+        {
+            'id': item_id,
+            'date': get_item_date(item_id),
+            'tags': Tag.get_obj_tag(item_id),
+        }
+        for item_id in list_item_id
+    ]
 
 def is_crawled(item_id):
     return item_basic.is_crawled(item_id)
@@ -516,18 +511,20 @@ def get_crawler_matadata(item_id, ltags=None):
 
 def is_onion(item_id):
     is_onion = False
-    if len(is_onion) > 62:
-        if is_crawled(item_id) and item_id[-42:-36] == '.onion':
-            is_onion = True
+    if (
+        len(is_onion) > 62
+        and is_crawled(item_id)
+        and item_id[-42:-36] == '.onion'
+    ):
+        is_onion = True
     return is_onion
 
 def is_item_in_domain(domain, item_id):
-    is_in_domain = False
     domain_lenght = len(domain)
-    if len(item_id) > (domain_lenght+48):
-        if item_id[-36-domain_lenght:-36] == domain:
-            is_in_domain = True
-    return is_in_domain
+    return (
+        len(item_id) > (domain_lenght + 48)
+        and item_id[-36 - domain_lenght : -36] == domain
+    )
 
 def get_item_domain(item_id):
     return item_basic.get_item_domain(item_id)
@@ -538,23 +535,30 @@ def get_domain(item_id):
     return item_id[:-36]
 
 def get_item_domain_with_port(item_id):
-    return r_serv_metadata.hget('paste_metadata:{}'.format(item_id), 'domain')
+    return r_serv_metadata.hget(f'paste_metadata:{item_id}', 'domain')
 
 def get_item_link(item_id):
-    return r_serv_metadata.hget('paste_metadata:{}'.format(item_id), 'real_link')
+    return r_serv_metadata.hget(f'paste_metadata:{item_id}', 'real_link')
 
 def get_item_screenshot(item_id):
-    screenshot = r_serv_metadata.hget('paste_metadata:{}'.format(item_id), 'screenshot')
-    if screenshot:
-        return os.path.join(screenshot[0:2], screenshot[2:4], screenshot[4:6], screenshot[6:8], screenshot[8:10], screenshot[10:12], screenshot[12:])
+    if screenshot := r_serv_metadata.hget(
+        f'paste_metadata:{item_id}', 'screenshot'
+    ):
+        return os.path.join(
+            screenshot[:2],
+            screenshot[2:4],
+            screenshot[4:6],
+            screenshot[6:8],
+            screenshot[8:10],
+            screenshot[10:12],
+            screenshot[12:],
+        )
+
     return ''
 
 def get_item_har_name(item_id):
-    har_path = os.path.join(har_directory, item_id) + '.json'
-    if os.path.isfile(har_path):
-        return har_path
-    else:
-        return None
+    har_path = f'{os.path.join(har_directory, item_id)}.json'
+    return har_path if os.path.isfile(har_path) else None
 
 def get_item_har(har_path):
     pass
@@ -565,48 +569,43 @@ def get_item_filename(item_id):
     filename = os.path.realpath(filename)
 
     # incorrect filename
-    if not os.path.commonprefix([filename, PASTES_FOLDER]) == PASTES_FOLDER:
-        return None
-    else:
-        return filename
+    return (
+        filename
+        if os.path.commonprefix([filename, PASTES_FOLDER]) == PASTES_FOLDER
+        else None
+    )
 
 def get_item_duplicate(item_id, r_list=True):
-    res = r_serv_metadata.smembers('dup:{}'.format(item_id))
+    res = r_serv_metadata.smembers(f'dup:{item_id}')
     if r_list:
-        if res:
-            return list(res)
-        else:
-            return []
+        return list(res) if res else []
     return res
 
 def get_item_nb_duplicates(item_id):
-    return r_serv_metadata.scard('dup:{}'.format(item_id))
+    return r_serv_metadata.scard(f'dup:{item_id}')
 
 def get_item_duplicates_dict(item_id):
     dict_duplicates = {}
     for duplicate in get_item_duplicate(item_id):
         duplicate = duplicate[1:-1].replace('\'', '').replace(' ', '').split(',')
         duplicate_id = duplicate[1]
-        if not duplicate_id in dict_duplicates:
+        if duplicate_id not in dict_duplicates:
             dict_duplicates[duplicate_id] = {'date': get_item_date(duplicate_id, add_separator=True), 'algo': {}}
         algo = duplicate[0]
-        if algo == 'tlsh':
-            similarity = 100 - int(duplicate[2])
-        else:
-            similarity = int(duplicate[2])
+        similarity = 100 - int(duplicate[2]) if algo == 'tlsh' else int(duplicate[2])
         dict_duplicates[duplicate_id]['algo'][algo] = similarity
     return dict_duplicates
 
 def add_item_duplicate(item_id, l_dup):
     for item_dup in l_dup:
-        r_serv_metadata.sadd('dup:{}'.format(item_dup), item_id)
-        r_serv_metadata.sadd('dup:{}'.format(item_id), item_dup)
+        r_serv_metadata.sadd(f'dup:{item_dup}', item_id)
+        r_serv_metadata.sadd(f'dup:{item_id}', item_dup)
 
 def delete_item_duplicate(item_id):
     item_dup = get_item_duplicate(item_id)
     for item_dup in get_item_duplicate(item_id):
-        r_serv_metadata.srem('dup:{}'.format(item_dup), item_id)
-    r_serv_metadata.delete('dup:{}'.format(item_id))
+        r_serv_metadata.srem(f'dup:{item_dup}', item_id)
+    r_serv_metadata.delete(f'dup:{item_id}')
 
 def get_raw_content(item_id):
     filepath = get_item_filepath(item_id)
@@ -639,14 +638,7 @@ def create_item(obj_id, obj_metadata, io_content):
     :return: is item created
     :rtype: boolean
     '''
-    # check if datetime match ??
-
-
-    # # TODO: validate obj_id
-
-    res = save_raw_content(obj_id, io_content)
-    # item saved
-    if res:
+    if res := save_raw_content(obj_id, io_content):
         # creata tags
         if 'tags' in obj_metadata:
             # # TODO: handle mixed tags: taxonomies and Galaxies
@@ -657,44 +649,34 @@ def create_item(obj_id, obj_metadata, io_content):
     return False
 
 def delete_item(obj_id):
-    # check if item exists
     if not exist_item(obj_id):
         return False
-    else:
-        delete_item_duplicate(obj_id)
+    delete_item_duplicate(obj_id)
         # delete MISP event
-        r_serv_metadata.delete('misp_events:{}'.format(obj_id))
-        r_serv_metadata.delete('hive_cases:{}'.format(obj_id))
+    r_serv_metadata.delete(f'misp_events:{obj_id}')
+    r_serv_metadata.delete(f'hive_cases:{obj_id}')
 
-        os.remove(get_item_filename(obj_id))
+    os.remove(get_item_filename(obj_id))
 
-        # get all correlation
-        obj_correlations = get_item_all_correlation(obj_id)
-        for correlation in obj_correlations:
-            if correlation=='cryptocurrency' or correlation=='pgp':
-                for obj2_subtype in obj_correlations[correlation]:
-                    for obj2_id in obj_correlations[correlation][obj2_subtype]:
-                        Correlate_object.delete_obj_relationship(correlation, obj2_id, 'item', obj_id,
-                                                            obj1_subtype=obj2_subtype)
-            else:
-                for obj2_id in obj_correlations[correlation]:
-                    Correlate_object.delete_obj_relationship(correlation, obj2_id, 'item', obj_id)
+    # get all correlation
+    obj_correlations = get_item_all_correlation(obj_id)
+    for correlation in obj_correlations:
+        if correlation in ['cryptocurrency', 'pgp']:
+            for obj2_subtype in obj_correlations[correlation]:
+                for obj2_id in obj_correlations[correlation][obj2_subtype]:
+                    Correlate_object.delete_obj_relationship(correlation, obj2_id, 'item', obj_id,
+                                                        obj1_subtype=obj2_subtype)
+        else:
+            for obj2_id in obj_correlations[correlation]:
+                Correlate_object.delete_obj_relationship(correlation, obj2_id, 'item', obj_id)
 
-        # delete father/child
-        delete_node(obj_id)
+    # delete father/child
+    delete_node(obj_id)
 
         # delete item metadata
-        r_serv_metadata.delete('paste_metadata:{}'.format(obj_id))
+    r_serv_metadata.delete(f'paste_metadata:{obj_id}')
 
-        return True
-
-    ### TODO in inport V2
-    # delete from tracked items
-
-    # # # TODO: # FIXME: LATER
-    # delete from queue
-    ###
-    return False
+    return True
 
 #### ####
 def delete_node(item_id):

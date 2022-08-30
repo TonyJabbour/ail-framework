@@ -53,13 +53,7 @@ class Sync_importer(AbstractModule):
 
     def run(self):
         while self.proceed:
-            ### REFRESH DICT
-            # if self.last_refresh < ail_2_ail.get_last_updated_ail_instance():
-            #     self.dict_ail_sync_filters = ail_2_ail.get_all_sync_queue_dict()
-            #     self.last_refresh = time.time()
-
-            ail_stream = ail_2_ail.get_sync_importer_ail_stream()
-            if ail_stream:
+            if ail_stream := ail_2_ail.get_sync_importer_ail_stream():
                 ail_stream = json.loads(ail_stream)
                 self.compute(ail_stream)
 

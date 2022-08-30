@@ -160,13 +160,13 @@ class SubmitPaste(AbstractModule):
                 self.redis_logger.debug(f'sanitize filename {filename}')
                 self.redis_logger.debug('file size allowed')
 
-                if not '.' in filename:
+                if '.' not in filename:
                     self.redis_logger.debug('no extension for filename')
                     try:
                         # Read file
                         with open(file_full_path,'r') as f:
                             content = f.read()
-                            self.r_serv_log_submit.set(uuid + ':nb_total', 1)
+                            self.r_serv_log_submit.set(f'{uuid}:nb_total', 1)
                             self.create_paste(uuid, content.encode(), ltags, ltagsgalaxies, uuid, source)
                     except:
                         self.abord_file_submission(uuid, "file error")
@@ -185,7 +185,7 @@ class SubmitPaste(AbstractModule):
                             # plain txt file
                             with open(file_full_path,'r') as f:
                                 content = f.read()
-                                self.r_serv_log_submit.set(uuid + ':nb_total', 1)
+                                self.r_serv_log_submit.set(f'{uuid}:nb_total', 1)
                                 self.create_paste(uuid, content.encode(), ltags, ltagsgalaxies, uuid, source)
                         else:
                         # Compressed file
@@ -264,13 +264,20 @@ class SubmitPaste(AbstractModule):
 
 
     def create_paste(self, uuid, paste_content, ltags, ltagsgalaxies, name, source=None):
-        # # TODO: Use Item create
-
-        result = False
-
         now = datetime.datetime.now()
-        source = source if source else 'submitted'
-        save_path = source + '/' + now.strftime("%Y") + '/' + now.strftime("%m") + '/' + now.strftime("%d") + '/submitted_' + name + '.gz'
+        source = source or 'submitted'
+        save_path = (
+            f'{source}/'
+            + now.strftime("%Y")
+            + '/'
+            + now.strftime("%m")
+            + '/'
+            + now.strftime("%d")
+            + '/submitted_'
+            + name
+            + '.gz'
+        )
+
 
         full_path = filename = os.path.join(os.environ['AIL_HOME'],
                                 self.process.config.get("Directories", "pastes"), save_path)
@@ -281,10 +288,7 @@ class SubmitPaste(AbstractModule):
             # file not exists in AIL paste directory
             self.redis_logger.debug(f"new paste {paste_content}")
 
-            gzip64encoded = self._compress_encode_content(paste_content)
-
-            if gzip64encoded:
-
+            if gzip64encoded := self._compress_encode_content(paste_content):
                 # use relative path
                 rel_item_path = save_path.replace(self.PASTES_FOLDER, '', 1)
                 self.redis_logger.debug(f"relative path {rel_item_path}")
@@ -319,7 +323,7 @@ class SubmitPaste(AbstractModule):
         else:
             self.addError(uuid, f'File: {save_path} already exist in submitted pastes')
 
-        return result
+        return False
 
 
     def _compress_encode_content(self, content):
@@ -339,7 +343,7 @@ class SubmitPaste(AbstractModule):
         print(errorMessage)
         error = self.r_serv_log_submit.get(f'{uuid}:error')
         if error != None:
-            self.r_serv_log_submit.set(f'{uuid}:error', error + '<br></br>' + errorMessage)
+            self.r_serv_log_submit.set(f'{uuid}:error', f'{error}<br></br>{errorMessage}')
 
         self.r_serv_log_submit.incr(f'{uuid}:nb_end')
 
@@ -360,16 +364,12 @@ class SubmitPaste(AbstractModule):
 
 
     def verify_extention_filename(self, filename):
-        if not '.' in filename:
+        if '.' not in filename:
             return True
-        else:
-            file_type = filename.rsplit('.', 1)[1]
+        file_type = filename.rsplit('.', 1)[1]
 
             #txt file
-            if file_type in SubmitPaste.ALLOWED_EXTENSIONS:
-                return True
-            else:
-                return False
+        return file_type in SubmitPaste.ALLOWED_EXTENSIONS
 
 
 if __name__ == '__main__':

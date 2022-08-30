@@ -44,10 +44,11 @@ if __name__ == "__main__":
         paste = Paste.Paste(filepath)
         content = paste.get_p_content()
         match_set = set(re.findall(regex, content))
-        if len(match_set) == 0:
+        if not match_set:
             continue
 
-        to_print = 'SourceCode;{};{};{};{}'.format(paste.p_source, paste.p_date, paste.p_name, message)
+        to_print = f'SourceCode;{paste.p_source};{paste.p_date};{paste.p_name};{message}'
+
 
         if len(match_set) > critical:
             publisher.warning(to_print)

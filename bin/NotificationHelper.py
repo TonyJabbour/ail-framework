@@ -66,7 +66,7 @@ def sendEmailNotification(recipient, mail_subject, mail_body):
 
         smtp_server.sendmail(sender, recipient, mime_msg.as_string())
         smtp_server.quit()
-        print('Send notification: ' + mail_subject + ' to '+recipient)
+        print(f'Send notification: {mail_subject} to {recipient}')
 
     except Exception as err:
         traceback.print_tb(err.__traceback__)

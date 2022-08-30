@@ -32,7 +32,6 @@ def get_dict_cve(list_paste_cve, only_one_same_cve_by_paste=False):
     if dict_keyword:
         res = [(k, dict_keyword[k]) for k in sorted(dict_keyword, key=dict_keyword.get, reverse=True)]
         for item in res:
-            pass
             print(item)
 
 

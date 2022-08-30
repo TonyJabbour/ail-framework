@@ -89,10 +89,11 @@ class Indexer(AbstractModule):
                     self.indexname = time_now
 
                 self.indexpath = join(self.baseindexpath, str(self.indexname))
-                if not exists_in(self.indexpath):
-                    self.ix = create_in(self.indexpath, self.schema)
-                else:
-                    self.ix = open_dir(self.indexpath)
+                self.ix = (
+                    open_dir(self.indexpath)
+                    if exists_in(self.indexpath)
+                    else create_in(self.indexpath, self.schema)
+                )
 
             self.last_refresh = time_now
 
@@ -142,16 +143,15 @@ class Indexer(AbstractModule):
         return in bytes
         """
         the_index_name = join(self.baseindexpath, self.indexname)
-        cur_sum = 0
-        for root, dirs, files in os.walk(the_index_name):
-            cur_sum += sum(getsize(join(root, name)) for name in files)
-
-        return cur_sum
+        return sum(
+            sum(getsize(join(root, name)) for name in files)
+            for root, dirs, files in os.walk(the_index_name)
+        )
 
 
     def move_index_into_old_index_folder(self):
         for cur_file in os.listdir(self.baseindexpath):
-            if not cur_file == "old_index":
+            if cur_file != "old_index":
                 shutil.move(join(self.baseindexpath, cur_file), join(
                     join(self.baseindexpath, "old_index"), cur_file))
 

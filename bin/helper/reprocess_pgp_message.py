@@ -16,8 +16,11 @@ sys.path.append(os.environ['AIL_BIN'])
 from Helper import Process
 
 def substract_date(date_from, date_to):
-    date_from = datetime.date(int(date_from[0:4]), int(date_from[4:6]), int(date_from[6:8]))
-    date_to = datetime.date(int(date_to[0:4]), int(date_to[4:6]), int(date_to[6:8]))
+    date_from = datetime.date(
+        int(date_from[:4]), int(date_from[4:6]), int(date_from[6:8])
+    )
+
+    date_to = datetime.date(int(date_to[:4]), int(date_to[4:6]), int(date_to[6:8]))
     delta = date_to - date_from # timedelta
     l_date = []
     for i in range(delta.days + 1):
@@ -37,14 +40,14 @@ r_tags = redis.StrictRedis(
 tag = 'infoleak:automatic-detection="pgp-message"'
 
 # get tag first/last seen
-first_seen = r_tags.hget('tag_metadata:{}'.format(tag), 'first_seen')
-last_seen = r_tags.hget('tag_metadata:{}'.format(tag), 'last_seen')
+first_seen = r_tags.hget(f'tag_metadata:{tag}', 'first_seen')
+last_seen = r_tags.hget(f'tag_metadata:{tag}', 'last_seen')
 
 l_dates = substract_date(first_seen, last_seen)
 
 # get all tagged items
 for date in l_dates:
-    daily_tagged_items = r_tags.smembers('{}:{}'.format(tag, date))
+    daily_tagged_items = r_tags.smembers(f'{tag}:{date}')
 
     for item in daily_tagged_items:
         p.populate_set_out(item, 'PgpDump')

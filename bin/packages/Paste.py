@@ -70,7 +70,7 @@ class Paste(object):
             self.p_path = os.path.join(self.PASTES_FOLDER, p_path)
         else:
             self.p_path = p_path
-            self.p_rel_path = p_path.replace(self.PASTES_FOLDER+'/', '', 1)
+            self.p_rel_path = p_path.replace(f'{self.PASTES_FOLDER}/', '', 1)
 
         self.p_name = os.path.basename(self.p_path)
         self.p_size = round(os.path.getsize(self.p_path)/1024.0, 2)
@@ -85,7 +85,8 @@ class Paste(object):
         self.p_date = Date(var[-4], var[-3], var[-2])
         self.p_date_path = os.path.join(var[-4], var[-3], var[-2], self.p_name)
         self.p_source = var[-5]
-        self.supposed_url = 'https://{}/{}'.format(self.p_source.replace('_pro', ''), var[-1].split('.gz')[0])
+        self.supposed_url = f"https://{self.p_source.replace('_pro', '')}/{var[-1].split('.gz')[0]}"
+
 
         self.p_encoding = None
         self.p_hash_kind = {}
@@ -98,12 +99,13 @@ class Paste(object):
         self.p_tags = None
 
     def get_item_dict(self):
-        dict_item = {}
-        dict_item['id'] = self.p_rel_path
-        dict_item['date'] = str(self.p_date)
-        dict_item['content'] = self.get_p_content()
-        tags = self._get_p_tags()
-        if tags:
+        dict_item = {
+            'id': self.p_rel_path,
+            'date': str(self.p_date),
+            'content': self.get_p_content(),
+        }
+
+        if tags := self._get_p_tags():
             dict_item['tags'] = tags
         return dict_item
 
@@ -123,7 +125,7 @@ class Paste(object):
         except UnicodeDecodeError:
             paste = None
         except Exception as e:
-            print("ERROR in: " + self.p_path)
+            print(f"ERROR in: {self.p_path}")
             print(e)
             paste = None
 
@@ -139,8 +141,7 @@ class Paste(object):
         return str(paste)
 
     def get_p_content_as_file(self):
-        message = StringIO(self.get_p_content())
-        return message
+        return StringIO(self.get_p_content())
 
     def get_p_content_with_removed_lines(self, threshold):
         num_line_removed = 0
@@ -148,7 +149,7 @@ class Paste(object):
         string_content = ""
         f = self.get_p_content_as_file()
         line_id = 0
-        for line_id, line in enumerate(f):
+        for line in f:
             length = len(line)
 
             if length < line_length_threshold:
@@ -291,34 +292,29 @@ class Paste(object):
         except ZeroDivisionError:
             var = 0.0
 
-        if var >= percent:
-            return True, var
-        else:
-            return False, var
+        return (True, var) if var >= percent else (False, var)
 
     def _get_p_duplicate(self):
-        p_duplicate = self.store_metadata.smembers('dup:'+self.p_path)
-        # remove absolute path #fix-db
-        if p_duplicate:
+        if p_duplicate := self.store_metadata.smembers(f'dup:{self.p_path}'):
             for duplicate_string in p_duplicate:
-                self.store_metadata.srem('dup:'+self.p_path, duplicate_string)
-                self.store_metadata.sadd('dup:'+self.p_rel_path, duplicate_string.replace(self.PASTES_FOLDER+'/', '', 1))
-        self.p_duplicate = self.store_metadata.smembers('dup:'+self.p_rel_path)
-        if self.p_duplicate is not None:
-            return list(self.p_duplicate)
-        else:
-            return '[]'
+                self.store_metadata.srem(f'dup:{self.p_path}', duplicate_string)
+                self.store_metadata.sadd(
+                    f'dup:{self.p_rel_path}',
+                    duplicate_string.replace(f'{self.PASTES_FOLDER}/', '', 1),
+                )
+
+        self.p_duplicate = self.store_metadata.smembers(f'dup:{self.p_rel_path}')
+        return list(self.p_duplicate) if self.p_duplicate is not None else '[]'
 
     def get_nb_duplicate(self):
         # # TODO: FIXME use relative path
-        return self.store_metadata.scard('dup:'+self.p_path) + self.store_metadata.scard('dup:'+self.p_rel_path)
+        return self.store_metadata.scard(
+            f'dup:{self.p_path}'
+        ) + self.store_metadata.scard(f'dup:{self.p_rel_path}')
 
     def _get_p_tags(self):
-        self.p_tags = self.store_metadata.smembers('tag:'+self.p_rel_path)
-        if self.p_tags is not None:
-            return list(self.p_tags)
-        else:
-            return '[]'
+        self.p_tags = self.store_metadata.smembers(f'tag:{self.p_rel_path}')
+        return list(self.p_tags) if self.p_tags is not None else '[]'
 
     def get_p_rel_path(self):
         return self.p_rel_path
@@ -353,7 +349,7 @@ class Paste(object):
         Save an attribute as a field
         """
         for tuple in value:
-            self.store_metadata.sadd('dup:'+self.p_path, tuple)
+            self.store_metadata.sadd(f'dup:{self.p_path}', tuple)
 
     def save_others_pastes_attribute_duplicate(self, list_value):
         """
@@ -362,13 +358,13 @@ class Paste(object):
         for hash_type, path, percent, date in list_value:
             path = path.replace(self.PASTES_FOLDER, '', 1)
             to_add = (hash_type, self.p_rel_path, percent, date)
-            self.store_metadata.sadd('dup:'+path,to_add)
+            self.store_metadata.sadd(f'dup:{path}', to_add)
 
     def _get_from_redis(self, r_serv):
-        ans = {}
-        for hash_name, the_hash in self.p_hash:
-            ans[hash_name] = r_serv.hgetall(the_hash)
-        return ans
+        return {
+            hash_name: r_serv.hgetall(the_hash)
+            for hash_name, the_hash in self.p_hash
+        }
 
     def _get_top_words(self, sort=False):
         """
@@ -388,17 +384,13 @@ class Paste(object):
         blob = TextBlob(clean( (self.get_p_content()) ), tokenizer=tokenizer)
 
         for word in blob.tokens:
-            if word in words.keys():
-                num = words[word]
-            else:
-                num = 0
+            num = words.get(word, 0)
             words[word] = num + 1
-        if sort:
-            var = sorted(words.items(), key=operator.itemgetter(1), reverse=True)
-        else:
-            var = words
-
-        return var
+        return (
+            sorted(words.items(), key=operator.itemgetter(1), reverse=True)
+            if sort
+            else words
+        )
 
     def _get_word(self, word):
         """
@@ -423,8 +415,8 @@ class Paste(object):
 
 
         """
-        matchs = []
-        for match in re.findall(regex, self.get_p_content()):
-            if match != '' and len(match) < 100:
-                matchs.append(match)
-        return matchs
+        return [
+            match
+            for match in re.findall(regex, self.get_p_content())
+            if match != '' and len(match) < 100
+        ]

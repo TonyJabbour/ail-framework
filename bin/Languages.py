@@ -22,7 +22,7 @@ if __name__ == '__main__':
     while True:
         message = p.get_from_set()
         if message is None:
-            publisher.debug("{} queue is empty, waiting".format(config_section))
+            publisher.debug(f"{config_section} queue is empty, waiting")
             time.sleep(1)
             continue
 

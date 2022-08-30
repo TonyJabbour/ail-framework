@@ -62,7 +62,7 @@ class Default_json(object):
         Return item id. define item id
         '''
         item_date = datetime.date.today().strftime("%Y/%m/%d")
-        return os.path.join(self.get_feeder_name(), item_date, str(uuid.uuid4())) + '.gz'
+        return f'{os.path.join(self.get_feeder_name(), item_date, str(uuid.uuid4()))}.gz'
 
     ## OVERWRITE ME ##
     def process_json_meta(self, process, item_id):

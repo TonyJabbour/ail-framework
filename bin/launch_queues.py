@@ -9,13 +9,7 @@ import time
 
 
 def check_pid(pid):
-    if pid is None:
-        # Already seen as finished.
-        return None
-    else:
-        if pid.poll() is not None:
-            return False
-    return True
+    return None if pid is None else pid.poll() is None
 
 if __name__ == '__main__':
     configfile = os.path.join(os.environ['AIL_BIN'], 'packages/modules.cfg')

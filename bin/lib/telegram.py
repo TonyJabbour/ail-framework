@@ -24,7 +24,7 @@ def save_item_correlation(username, item_id, item_date):
     Username.save_item_correlation('telegram', username, item_id, item_date)
 
 def save_telegram_invite_hash(invite_hash, item_id):
-    r_serv_crawler.sadd('telegram:invite_code', '{};{}'.format(invite_hash, item_id))
+    r_serv_crawler.sadd('telegram:invite_code', f'{invite_hash};{item_id}')
 
 def get_data_from_telegram_url(base_url, url_path):
     dict_url = {}
@@ -33,14 +33,12 @@ def get_data_from_telegram_url(base_url, url_path):
     # username len > 5, a-z A-Z _
     if len(url_path) == 1:
         username = url_path[0].lower()
-        username = REGEX_USERNAME.search(username)
-        if username:
+        if username := REGEX_USERNAME.search(username):
             username = username[0].replace('\\', '')
             if len(username) > 5:
                 dict_url['username'] = username
     elif url_path[0] == 'joinchat':
-        invite_hash = REGEX_JOIN_HASH.search(url_path[1])
-        if invite_hash:
+        if invite_hash := REGEX_JOIN_HASH.search(url_path[1]):
             invite_hash = invite_hash[0]
             dict_url['invite_hash'] = invite_hash
     return dict_url
@@ -59,8 +57,7 @@ def get_data_from_tg_url(tg_link):
         if url.query[:7] == 'domain=':
             # remove domain=
             username = url.query[7:]
-            username = REGEX_USERNAME.search(username)
-            if username:
+            if username := REGEX_USERNAME.search(username):
                 username = username[0].replace('\\', '')
                 if len(username) > 5:
                     dict_url['username'] = username
@@ -68,14 +65,12 @@ def get_data_from_tg_url(tg_link):
     elif url.netloc == 'join' and len(url.query) > 7:
         if url.query[:7] == 'invite=':
             invite_hash = url.query[7:]
-            invite_hash = REGEX_JOIN_HASH.search(invite_hash)
-            if invite_hash:
+            if invite_hash := REGEX_JOIN_HASH.search(invite_hash):
                 invite_hash = invite_hash[0]
                 dict_url['invite_hash'] = invite_hash
 
     elif url.netloc == 'login' and len(url.query) > 5:
-        login_code = url.query[5:]
-        if login_code:
+        if login_code := url.query[5:]:
             dict_url['login_code'] = login_code
     else:
         # # TODO: log invalid URL ???????

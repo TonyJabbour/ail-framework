@@ -15,4 +15,8 @@ config_loader = None
 
 def incr_module_timeout_statistic(module_name):
     curr_date = datetime.date.today()
-    r_serv_statistics.hincrby(curr_date.strftime("%Y%m%d"), 'paste_by_modules_timeout:{}'.format(module_name), 1)
+    r_serv_statistics.hincrby(
+        curr_date.strftime("%Y%m%d"),
+        f'paste_by_modules_timeout:{module_name}',
+        1,
+    )

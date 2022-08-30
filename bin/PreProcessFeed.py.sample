@@ -23,8 +23,7 @@ def do_something(message):
 
     paste_name = paste_name.replace("pastebin", "pastebinPROCESSED")
 
-    to_send = "{0} {1}".format(paste_name, gzip64encoded)
-    return to_send
+    return "{0} {1}".format(paste_name, gzip64encoded)
 
 if __name__ == '__main__':
     # If you wish to use an other port of channel, do not forget to run a subscriber accordingly (see launch_logs.sh)
@@ -47,7 +46,7 @@ if __name__ == '__main__':
         # Get one message from the input queue
         message = p.get_from_set()
         if message is None:
-            publisher.debug("{} queue is empty, waiting".format(config_section))
+            publisher.debug(f"{config_section} queue is empty, waiting")
             print("queue empty")
             time.sleep(1)
             continue

@@ -58,22 +58,25 @@ def get_json_receiver_class(feeder_name_in):
     feeder_name = feeder_name_in[:1].upper() + feeder_name_in[1:]
     feeder_name = feeder_name.replace('-', '_')
 
-    if feeder_name is None or feeder_name not in get_json_importer_list():
+    if (
+        feeder_name is None
+        or feeder_name is not None
+        and feeder_name not in get_json_importer_list()
+    ):
         reload_json_importer_list() # add refresh timing ?
         if feeder_name not in get_json_importer_list():
-            print('Unknow feeder: {}'.format(feeder_name_in))
+            print(f'Unknow feeder: {feeder_name_in}')
             feeder_name = 'Default_json'
     # avoid subpackages
     parts = feeder_name.split('.')
-    module = 'ail_json_importer.{}'.format(parts[-1])
+    module = f'ail_json_importer.{parts[-1]}'
     # import json importer class
     try:
         mod = importlib.import_module(module)
     except:
         raise
     mod = importlib.import_module(module)
-    class_name = getattr(mod, feeder_name)
-    return class_name
+    return getattr(mod, feeder_name)
 
 def get_json_source(json_item):
     return json_item.get('source', DEFAULT_FEEDER_NAME)
@@ -103,8 +106,6 @@ def api_import_json_item(data_json):
     if not data_json:
         return ({'status': 'error', 'reason': 'Malformed JSON'}, 400)
 
-    # # TODO: add JSON verification
-    res = add_json_to_json_queue(data_json)
-    if res:
+    if res := add_json_to_json_queue(data_json):
         return ({'status': 'error'}, 400)
     return ({'status': 'success'}, 200)

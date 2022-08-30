@@ -31,8 +31,7 @@ def get_all_index():
     all_index = []
     with open(all_index_file) as f:
         for line in f:
-            line = line.replace('\n', '')
-            if line:
+            if line := line.replace('\n', ''):
                 all_index.append(line)
     return all_index
 
@@ -60,10 +59,10 @@ def delete_index_by_name(index_name):
     index_path = get_index_full_path(index_name)
     index_path = os.path.realpath(index_path)
     # incorrect filename
-    if not os.path.commonprefix([index_path, INDEX_PATH]) == INDEX_PATH:
-        raise Exception('Path traversal detected {}'.format(index_path))
+    if os.path.commonprefix([index_path, INDEX_PATH]) != INDEX_PATH:
+        raise Exception(f'Path traversal detected {index_path}')
     if not os.path.isdir(index_path):
-        print('Error: The index directory {} doesn\'t exist'.format(index_path))
+        print(f"Error: The index directory {index_path} doesn\'t exist")
         return None
     res = rmtree(index_path)
     _remove_index_name_from_all_index(index_name)
@@ -80,12 +79,11 @@ def delete_last_index():
 
 #keep time most recent index
 def delete_older_index_by_time(int_time):
-    all_index = get_all_index()
-    if all_index:
+    if all_index := get_all_index():
         if int(all_index[-1]) > int_time: # make sure to keep one files
             for index_name in all_index:
                 if int(index_name) < int_time:
-                    print('deleting index {} ...'.format(index_name))
+                    print(f'deleting index {index_name} ...')
                     delete_index_by_name(index_name)
 
 # keep x most recent index
@@ -93,8 +91,8 @@ def delete_older_index(number_of_index_to_keep):
     if number_of_index_to_keep > 1:
         all_index = get_all_index()
         if len(get_all_index()) > number_of_index_to_keep:
-            for index_name in all_index[0:-number_of_index_to_keep]:
-                print('deleting index {} ...'.format(index_name))
+            for index_name in all_index[:-number_of_index_to_keep]:
+                print(f'deleting index {index_name} ...')
                 delete_index_by_name(index_name)
 
 ##-- DATA RETENTION  --##

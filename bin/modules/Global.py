@@ -60,7 +60,7 @@ class Global(AbstractModule):
         # Get and sanityze ITEM DIRECTORY
         # # TODO: rename PASTE => ITEM
         self.PASTES_FOLDER = os.path.join(os.environ['AIL_HOME'], self.process.config.get("Directories", "pastes"))
-        self.PASTES_FOLDERS = self.PASTES_FOLDER + '/'
+        self.PASTES_FOLDERS = f'{self.PASTES_FOLDER}/'
         self.PASTES_FOLDERS = os.path.join(os.path.realpath(self.PASTES_FOLDERS), '')
 
         # Waiting time in secondes between to message proccessed
@@ -94,7 +94,7 @@ class Global(AbstractModule):
 
             file_name_item = item.split('/')[-1]
             if len(file_name_item) > 255:
-                new_file_name_item = '{}{}.gz'.format(file_name_item[:215], str(uuid4()))
+                new_file_name_item = f'{file_name_item[:215]}{str(uuid4())}.gz'
                 item = self.rreplace(item, file_name_item, new_file_name_item, 1)
 
             # Creating the full filepath
@@ -102,19 +102,18 @@ class Global(AbstractModule):
             filename = os.path.realpath(filename)
 
             # Incorrect filename
-            if not os.path.commonprefix([filename, self.PASTES_FOLDER]) == self.PASTES_FOLDER:
+            if (
+                os.path.commonprefix([filename, self.PASTES_FOLDER])
+                != self.PASTES_FOLDER
+            ):
                 self.redis_logger.warning(f'Global; Path traversal detected {filename}')
                 print(f'Global; Path traversal detected {filename}')
 
             else:
                 # Decode compressed base64
                 decoded = base64.standard_b64decode(gzip64encoded)
-                new_file_content = self.gunzip_bytes_obj(filename, decoded)
-
-                if new_file_content:
-                    filename = self.check_filename(filename, new_file_content)
-
-                    if filename:
+                if new_file_content := self.gunzip_bytes_obj(filename, decoded):
+                    if filename := self.check_filename(filename, new_file_content):
                         # create subdir
                         dirname = os.path.dirname(filename)
                         if not os.path.exists(dirname):
@@ -149,10 +148,7 @@ class Global(AbstractModule):
             self.redis_logger.warning(f'File already exist {filename}')
             print(f'File already exist {filename}')
 
-            # Check that file already exists but content differs
-            curr_file_content = self.gunzip_file(filename)
-
-            if curr_file_content:
+            if curr_file_content := self.gunzip_file(filename):
                 # Compare file content with message content with MD5 checksums
                 curr_file_md5 = md5(curr_file_content).hexdigest()
                 new_file_md5 = md5(new_file_content).hexdigest()

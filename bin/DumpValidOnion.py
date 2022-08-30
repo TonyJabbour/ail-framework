@@ -21,15 +21,14 @@ if __name__ == "__main__":
     while True:
         message = p.get_from_set()
         if message is not None:
-            f = open(dump_file, 'a')
-            while message is not None:
-                print(message)
-                date = datetime.datetime.now()
-                if message is not None:
-                    f.write(date.isoformat() + ' ' + message + '\n')
-                else:
-                    break
-                message = p.get_from_set()
-            f.close()
+            with open(dump_file, 'a') as f:
+                while message is not None:
+                    print(message)
+                    date = datetime.datetime.now()
+                    if message is not None:
+                        f.write(f'{date.isoformat()} {message}' + '\n')
+                    else:
+                        break
+                    message = p.get_from_set()
         else:
             time.sleep(20)

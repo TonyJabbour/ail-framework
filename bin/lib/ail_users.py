@@ -19,10 +19,7 @@ class User(object):
 
     def __init__(self, id):
         self.id = id
-        if self.id == '__anonymous__':
-            self.role = 'anonymous'
-        else:
-            self.role = None
+        self.role = 'anonymous' if self.id == '__anonymous__' else None
 
     def get_role(self):
         pass

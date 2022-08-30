@@ -99,14 +99,13 @@ class SentimentAnalysis(AbstractModule):
         p_MimeType = paste._get_p_encoding()
 
         # Perform further analysis
-        if p_MimeType == "text/plain":
-            if self.isJSON(p_content):
-                p_MimeType = "JSON"
+        if p_MimeType == "text/plain" and self.isJSON(p_content):
+            p_MimeType = "JSON"
 
         if p_MimeType in SentimentAnalysis.accepted_Mime_type:
             self.redis_logger.debug(f'Accepted :{p_MimeType}')
 
-            the_date = datetime.date(int(p_date[0:4]), int(p_date[4:6]), int(p_date[6:8]))
+            the_date = datetime.date(int(p_date[:4]), int(p_date[4:6]), int(p_date[6:8]))
             the_time = datetime.datetime.now()
             the_time = datetime.time(getattr(the_time, 'hour'), 0, 0)
             combined_datetime = datetime.datetime.combine(the_date, the_time)
@@ -154,7 +153,7 @@ class SentimentAnalysis(AbstractModule):
 
                 self.db.sadd('Provider_set', provider)
 
-                provider_timestamp = provider + '_' + str(timestamp)
+                provider_timestamp = f'{provider}_{str(timestamp)}'
                 self.db.incr('UniqID')
                 UniqID = self.db.get('UniqID')
                 self.redis_logger.debug(f'{provider_timestamp}->{UniqID}dropped{num_line_removed}lines')

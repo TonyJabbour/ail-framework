@@ -41,11 +41,15 @@ class Screenshot(AbstractObject):
         pass
 
     def get_link(self, flask_context=False):
-        if flask_context:
-            url = url_for('correlation.show_correlation', object_type=self.type, correlation_id=self.id)
-        else:
-            url = f'{baseurl}/correlation/show_correlation?object_type={self.type}&correlation_id={self.id}'
-        return url
+        return (
+            url_for(
+                'correlation.show_correlation',
+                object_type=self.type,
+                correlation_id=self.id,
+            )
+            if flask_context
+            else f'{baseurl}/correlation/show_correlation?object_type={self.type}&correlation_id={self.id}'
+        )
 
     def get_svg_icon(self):
         return {'style': 'fas', 'icon': '\uf03e', 'color': '#E1F5DF', 'radius':5}

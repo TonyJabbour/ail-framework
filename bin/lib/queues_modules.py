@@ -25,25 +25,25 @@ def get_all_queues_with_sorted_nb_elem():
     return res
 
 def get_module_pid_by_queue_name(queue_name):
-    return r_serv_queues.smembers('MODULE_TYPE_{}'.format(queue_name))
+    return r_serv_queues.smembers(f'MODULE_TYPE_{queue_name}')
 
 # # TODO: remove last msg part
 def get_module_last_process_start_time(queue_name, module_pid):
-    res = r_serv_queues.get('MODULE_{}_{}'.format(queue_name, module_pid))
-    if res:
+    if res := r_serv_queues.get(f'MODULE_{queue_name}_{module_pid}'):
         return res.split(',')[0]
     return None
 
 def get_module_last_msg(queue_name, module_pid):
-    return r_serv_queues.get('MODULE_{}_{}_PATH'.format(queue_name, module_pid))
+    return r_serv_queues.get(f'MODULE_{queue_name}_{module_pid}_PATH')
 
 def get_all_modules_queues_stats():
     all_modules_queues_stats = []
     for queue_name, nb_elem_queue in get_all_queues_with_sorted_nb_elem():
         l_module_pid = get_module_pid_by_queue_name(queue_name)
         for module_pid in l_module_pid:
-            last_process_start_time = get_module_last_process_start_time(queue_name, module_pid)
-            if last_process_start_time:
+            if last_process_start_time := get_module_last_process_start_time(
+                queue_name, module_pid
+            ):
                 last_process_start_time = datetime.datetime.fromtimestamp(int(last_process_start_time))
                 seconds = int((datetime.datetime.now() - last_process_start_time).total_seconds())
             else:
@@ -61,10 +61,7 @@ def _get_all_messages_from_queue(queue_name):
 #     pass
 
 def remove_message_from_queue(queue_name, message, out=False):
-    if out:
-        queue_key = f'{queue_name}out'
-    else:
-        queue_key = f'{queue_name}in'
+    queue_key = f'{queue_name}out' if out else f'{queue_name}in'
     r_serv_queues.srem(queue_in, message)
     if not out:
         r_serv_queues.hset('queues', queue_name, int(r_serv_queues.scard(queue_key)) )

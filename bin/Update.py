@@ -26,34 +26,28 @@ UPDATER_LAST_MODIFICATION = float(os.stat(UPDATER_FILENAME).st_mtime)
 
 def auto_update_enabled(cfg):
     auto_update = cfg.get('Update', 'auto_update')
-    if auto_update == 'True' or auto_update == 'true':
-        return True
-    else:
-        return False
+    return auto_update in ['True', 'true']
 
 # check if files are modify locally
 def check_if_files_modified():
     process = subprocess.run(['git', 'ls-files' ,'-m'], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
     if process.returncode == 0:
-        modified_files = process.stdout
-        if modified_files:
-            l_modified_files = []
-            for modified_file in modified_files.decode().split('\n'):
-                if modified_file:
-                    if modified_file.split('/')[0] != 'configs':
-                        l_modified_files.append(modified_file)
-            if l_modified_files:
-                print('Modified Files:')
-                for modified_file in l_modified_files:
-                    print('{}{}{}'.format(TERMINAL_BLUE, modified_file, TERMINAL_DEFAULT))
-                print()
-                return False
-            else:
-                return True
+        if not (modified_files := process.stdout):
+            return True
+        if l_modified_files := [
+            modified_file
+            for modified_file in modified_files.decode().split('\n')
+            if modified_file and modified_file.split('/')[0] != 'configs'
+        ]:
+            print('Modified Files:')
+            for modified_file in l_modified_files:
+                print(f'{TERMINAL_BLUE}{modified_file}{TERMINAL_DEFAULT}')
+            print()
+            return False
         else:
             return True
     else:
-        print('{}{}{}'.format(TERMINAL_RED, process.stderr.decode(), TERMINAL_DEFAULT))
+        print(f'{TERMINAL_RED}{process.stderr.decode()}{TERMINAL_DEFAULT}')
         sys.exit(1)
 
 def repo_is_fork():
@@ -63,21 +57,20 @@ def repo_is_fork():
     if process.returncode == 0:
         res = process.stdout.decode()
         if 'origin	{}'.format(AIL_REPO) in res:
-            print('    This repository is a {}clone of {}{}'.format(TERMINAL_BLUE, AIL_REPO, TERMINAL_DEFAULT))
+            print(
+                f'    This repository is a {TERMINAL_BLUE}clone of {AIL_REPO}{TERMINAL_DEFAULT}'
+            )
+
             return False
         elif 'origin	{}'.format(OLD_AIL_REPO) in res:
             print('    old AIL repository, Updating remote origin...')
-            res = git_status.set_default_remote(AIL_REPO, verbose=False)
-            if res:
-                return False
-            else:
-                return True
+            return not (res := git_status.set_default_remote(AIL_REPO, verbose=False))
         else:
-            print('    This repository is a {}fork{}'.format(TERMINAL_BLUE, TERMINAL_DEFAULT))
+            print(f'    This repository is a {TERMINAL_BLUE}fork{TERMINAL_DEFAULT}')
             print()
             return True
     else:
-        print('{}{}{}'.format(TERMINAL_RED, process.stderr.decode(), TERMINAL_DEFAULT))
+        print(f'{TERMINAL_RED}{process.stderr.decode()}{TERMINAL_DEFAULT}')
         aborting_update()
         sys.exit(0)
 
@@ -85,67 +78,72 @@ def is_upstream_created(upstream):
     process = subprocess.run(['git', 'remote', '-v'], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
     if process.returncode == 0:
         output = process.stdout.decode()
-        if upstream in output:
-            return True
-        else:
-            return False
+        return upstream in output
     else:
-        print('{}{}{}'.format(TERMINAL_RED, process.stderr.decode(), TERMINAL_DEFAULT))
+        print(f'{TERMINAL_RED}{process.stderr.decode()}{TERMINAL_DEFAULT}')
         aborting_update()
         sys.exit(0)
 
 def create_fork_upstream(upstream):
-    print('{}... Creating upstream ...{}'.format(TERMINAL_YELLOW, TERMINAL_DEFAULT))
-    print('git remote add {} {}'.format(upstream, AIL_REPO))
+    print(f'{TERMINAL_YELLOW}... Creating upstream ...{TERMINAL_DEFAULT}')
+    print(f'git remote add {upstream} {AIL_REPO}')
     process = subprocess.run(['git', 'remote', 'add', upstream, AIL_REPO], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
     if process.returncode == 0:
         print(process.stdout.decode())
         if is_upstream_created(upstream):
             print('Fork upstream created')
-            print('{}...    ...{}'.format(TERMINAL_YELLOW, TERMINAL_DEFAULT))
+            print(f'{TERMINAL_YELLOW}...    ...{TERMINAL_DEFAULT}')
         else:
             print('Fork not created')
             aborting_update()
             sys.exit(0)
     else:
-        print('{}{}{}'.format(TERMINAL_RED, process.stderr.decode(), TERMINAL_DEFAULT))
+        print(f'{TERMINAL_RED}{process.stderr.decode()}{TERMINAL_DEFAULT}')
         aborting_update()
         sys.exit(0)
 
 def update_fork():
-    print('{}... Updating fork ...{}'.format(TERMINAL_YELLOW, TERMINAL_DEFAULT))
-    if cfg.get('Update', 'update-fork') == 'True' or cfg.get('Update', 'update-fork') == 'true':
+    print(f'{TERMINAL_YELLOW}... Updating fork ...{TERMINAL_DEFAULT}')
+    if cfg.get('Update', 'update-fork') in ['True', 'true']:
         upstream = cfg.get('Update', 'upstream')
         if not is_upstream_created(upstream):
             create_fork_upstream(upstream)
-        print('{}git fetch {}:{}'.format(TERMINAL_YELLOW, upstream, TERMINAL_DEFAULT))
+        print(f'{TERMINAL_YELLOW}git fetch {upstream}:{TERMINAL_DEFAULT}')
         process = subprocess.run(['git', 'fetch', upstream], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
         if process.returncode == 0:
             print(process.stdout.decode())
-            print('{}git checkout master:{}'.format(TERMINAL_YELLOW, TERMINAL_DEFAULT))
+            print(f'{TERMINAL_YELLOW}git checkout master:{TERMINAL_DEFAULT}')
             process = subprocess.run(['git', 'checkout', 'master'], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
             if process.returncode == 0:
                 print(process.stdout.decode())
-                print('{}git merge {}/master:{}'.format(TERMINAL_YELLOW, upstream, TERMINAL_DEFAULT))
-                process = subprocess.run(['git', 'merge', '{}/master'.format(upstream)], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+                print(f'{TERMINAL_YELLOW}git merge {upstream}/master:{TERMINAL_DEFAULT}')
+                process = subprocess.run(
+                    ['git', 'merge', f'{upstream}/master'],
+                    stdout=subprocess.PIPE,
+                    stderr=subprocess.PIPE,
+                )
+
                 if process.returncode == 0:
                     print(process.stdout.decode())
-                    print('{}...    ...{}'.format(TERMINAL_YELLOW, TERMINAL_DEFAULT))
+                    print(f'{TERMINAL_YELLOW}...    ...{TERMINAL_DEFAULT}')
                 else:
-                    print('{}{}{}'.format(TERMINAL_RED, process.stderr.decode(), TERMINAL_DEFAULT))
+                    print(f'{TERMINAL_RED}{process.stderr.decode()}{TERMINAL_DEFAULT}')
                     aborting_update()
                     sys.exit(1)
             else:
-                print('{}{}{}'.format(TERMINAL_RED, process.stderr.decode(), TERMINAL_DEFAULT))
+                print(f'{TERMINAL_RED}{process.stderr.decode()}{TERMINAL_DEFAULT}')
                 aborting_update()
                 sys.exit(0)
         else:
-            print('{}{}{}'.format(TERMINAL_RED, process.stderr.decode(), TERMINAL_DEFAULT))
+            print(f'{TERMINAL_RED}{process.stderr.decode()}{TERMINAL_DEFAULT}')
             aborting_update()
             sys.exit(0)
 
     else:
-        print('{}Fork Auto-Update disabled in config file{}'.format(TERMINAL_YELLOW, TERMINAL_DEFAULT))
+        print(
+            f'{TERMINAL_YELLOW}Fork Auto-Update disabled in config file{TERMINAL_DEFAULT}'
+        )
+
         aborting_update()
         sys.exit(0)
 
@@ -161,7 +159,7 @@ def get_git_current_tag(current_version_path):
 
     version = version.replace(" ", "").splitlines()[0]
     if version[0] != 'v':
-        version = 'v{}'.format(version)
+        version = f'v{version}'
     return version
 
 def get_git_upper_tags_remote(current_tag, is_fork):
@@ -184,14 +182,17 @@ def get_git_upper_tags_remote(current_tag, is_fork):
                 # force update order
                 list_upper_tags.sort()
                 return list_upper_tags
-            for tag in list_all_tags:
-                if float(tag[1:]) >= float(current_tag_val):
-                    list_upper_tags.append( (tag, None) )
+            list_upper_tags.extend(
+                (tag, None)
+                for tag in list_all_tags
+                if float(tag[1:]) >= float(current_tag_val)
+            )
+
             # force update order
             list_upper_tags.sort()
             return list_upper_tags
         else:
-            print('{}{}{}'.format(TERMINAL_RED, process.stderr.decode(), TERMINAL_DEFAULT))
+            print(f'{TERMINAL_RED}{process.stderr.decode()}{TERMINAL_DEFAULT}')
             aborting_update()
             sys.exit(0)
     else:
@@ -205,9 +206,6 @@ def get_git_upper_tags_remote(current_tag, is_fork):
             list_upper_tags = []
             if last_tag[1:] == current_tag:
                 list_upper_tags.append( (last_tag, last_commit) )
-                # force update order
-                list_upper_tags.sort()
-                return list_upper_tags
             else:
                 dict_tags_commit = {}
                 for mess_tag in list_all_tags:
@@ -230,28 +228,32 @@ def get_git_upper_tags_remote(current_tag, is_fork):
                         continue
 
                     # add tag with last commit
-                    if float(tag_val) >= float(current_tag_val):
+                    if tag_val >= float(current_tag_val):
                         dict_tags_commit[tag] = commit
-                list_upper_tags = [('v{}'.format(key), dict_tags_commit[key]) for key in dict_tags_commit]
-                # force update order
-                list_upper_tags.sort()
-                return list_upper_tags
+                list_upper_tags = [
+                    (f'v{key}', dict_tags_commit[key])
+                    for key in dict_tags_commit
+                ]
+
+            # force update order
+            list_upper_tags.sort()
+            return list_upper_tags
         else:
-            print('{}{}{}'.format(TERMINAL_RED, process.stderr.decode(), TERMINAL_DEFAULT))
+            print(f'{TERMINAL_RED}{process.stderr.decode()}{TERMINAL_DEFAULT}')
             aborting_update()
             sys.exit(0)
 
 def update_submodules():
-    print('{}git submodule update:{}'.format(TERMINAL_YELLOW, TERMINAL_DEFAULT))
+    print(f'{TERMINAL_YELLOW}git submodule update:{TERMINAL_DEFAULT}')
     process = subprocess.run(['git', 'submodule', 'update'], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
     if process.returncode == 0:
         print(process.stdout.decode())
         print()
     else:
-        print('{}{}{}'.format(TERMINAL_RED, process.stderr.decode(), TERMINAL_DEFAULT))
+        print(f'{TERMINAL_RED}{process.stderr.decode()}{TERMINAL_DEFAULT}')
 
 def update_ail(current_tag, list_upper_tags_remote, current_version_path, is_fork):
-    print('{}git checkout master:{}'.format(TERMINAL_YELLOW, TERMINAL_DEFAULT))
+    print(f'{TERMINAL_YELLOW}git checkout master:{TERMINAL_DEFAULT}')
     process = subprocess.run(['git', 'checkout', 'master'], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
     #process = subprocess.run(['ls'], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
     if process.returncode == 0:
@@ -260,7 +262,7 @@ def update_ail(current_tag, list_upper_tags_remote, current_version_path, is_for
 
         update_submodules()
 
-        print('{}git pull:{}'.format(TERMINAL_YELLOW, TERMINAL_DEFAULT))
+        print(f'{TERMINAL_YELLOW}git pull:{TERMINAL_DEFAULT}')
         process = subprocess.run(['git', 'pull'], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
 
         if process.returncode == 0:
@@ -270,7 +272,10 @@ def update_ail(current_tag, list_upper_tags_remote, current_version_path, is_for
             # CHECK IF UPDATER Update
             if float(os.stat(UPDATER_FILENAME).st_mtime) > UPDATER_LAST_MODIFICATION:
                 # request updater relauch
-                print('{}{}{}'.format(TERMINAL_RED, '                  Relaunch Launcher                    ', TERMINAL_DEFAULT))
+                print(
+                    f'{TERMINAL_RED}                  Relaunch Launcher                    {TERMINAL_DEFAULT}'
+                )
+
                 sys.exit(3)
 
             if len(list_upper_tags_remote) == 1:
@@ -278,20 +283,29 @@ def update_ail(current_tag, list_upper_tags_remote, current_version_path, is_for
                 additional_update_path = os.path.join(os.environ['AIL_HOME'], 'update', current_tag, 'additional_update.sh')
                 if os.path.isfile(additional_update_path):
                     print()
-                    print('{}------------------------------------------------------------------'.format(TERMINAL_YELLOW))
+                    print(
+                        f'{TERMINAL_YELLOW}------------------------------------------------------------------'
+                    )
+
                     print('-                 Launching Additional Update:                   -')
-                    print('--  --  --  --  --  --  --  --  --  --  --  --  --  --  --  --  --{}'.format(TERMINAL_DEFAULT))
+                    print(
+                        f'--  --  --  --  --  --  --  --  --  --  --  --  --  --  --  --  --{TERMINAL_DEFAULT}'
+                    )
+
                     process = subprocess.run(['bash', additional_update_path], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
                     if process.returncode == 0:
                         output = process.stdout.decode()
                         print(output)
                     else:
-                        print('{}{}{}'.format(TERMINAL_RED, process.stderr.decode(), TERMINAL_DEFAULT))
+                        print(f'{TERMINAL_RED}{process.stderr.decode()}{TERMINAL_DEFAULT}')
                         aborting_update()
                         sys.exit(1)
 
                 print()
-                print('{}****************  AIL Sucessfully Updated  *****************{}'.format(TERMINAL_YELLOW, TERMINAL_DEFAULT))
+                print(
+                    f'{TERMINAL_YELLOW}****************  AIL Sucessfully Updated  *****************{TERMINAL_DEFAULT}'
+                )
+
                 print()
                 exit(0)
 
@@ -307,24 +321,36 @@ def update_ail(current_tag, list_upper_tags_remote, current_version_path, is_for
                 for update in list_update:
                     launch_update_version(update[0], update[1], current_version_path, is_fork)
                 # Sucess
-                print('{}****************  AIL Sucessfully Updated  *****************{}'.format(TERMINAL_YELLOW, TERMINAL_DEFAULT))
+                print(
+                    f'{TERMINAL_YELLOW}****************  AIL Sucessfully Updated  *****************{TERMINAL_DEFAULT}'
+                )
+
                 print()
                 sys.exit(0)
         else:
-            print('{}{}{}'.format(TERMINAL_RED, process.stderr.decode(), TERMINAL_DEFAULT))
+            print(f'{TERMINAL_RED}{process.stderr.decode()}{TERMINAL_DEFAULT}')
             aborting_update()
             sys.exit(1)
     else:
-        print('{}{}{}'.format(TERMINAL_RED, process.stderr.decode(), TERMINAL_DEFAULT))
+        print(f'{TERMINAL_RED}{process.stderr.decode()}{TERMINAL_DEFAULT}')
         aborting_update()
         sys.exit(0)
 
 def launch_update_version(version, roll_back_commit, current_version_path, is_fork):
     update_path = os.path.join(os.environ['AIL_HOME'], 'update', str(version), 'Update.sh')
     print()
-    print('{}------------------------------------------------------------------'.format(TERMINAL_YELLOW))
-    print('-                 Launching Update: {}{}{}                         -'.format(TERMINAL_BLUE, version, TERMINAL_YELLOW))
-    print('--  --  --  --  --  --  --  --  --  --  --  --  --  --  --  --  --{}'.format(TERMINAL_DEFAULT))
+    print(
+        f'{TERMINAL_YELLOW}------------------------------------------------------------------'
+    )
+
+    print(
+        f'-                 Launching Update: {TERMINAL_BLUE}{version}{TERMINAL_YELLOW}                         -'
+    )
+
+    print(
+        f'--  --  --  --  --  --  --  --  --  --  --  --  --  --  --  --  --{TERMINAL_DEFAULT}'
+    )
+
     if not os.path.isfile(update_path):
         update_path = os.path.join(os.environ['AIL_HOME'], 'update', 'default_update', 'Update.sh')
         process = subprocess.Popen(['bash', update_path, version], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
@@ -343,15 +369,27 @@ def launch_update_version(version, roll_back_commit, current_version_path, is_fo
         with open(current_version_path, 'w') as version_content:
             version_content.write(version)
 
-            print('{}--  --  --  --  --  --  --  --  --  --  --  --  --  --  --  --  --'.format(TERMINAL_YELLOW))
-            print('-               Sucessfully Updated: {}{}{}                        -'.format(TERMINAL_BLUE, version, TERMINAL_YELLOW))
-            print('------------------------------------------------------------------{}'.format(TERMINAL_DEFAULT))
+            print(
+                f'{TERMINAL_YELLOW}--  --  --  --  --  --  --  --  --  --  --  --  --  --  --  --  --'
+            )
+
+            print(
+                f'-               Sucessfully Updated: {TERMINAL_BLUE}{version}{TERMINAL_YELLOW}                        -'
+            )
+
+            print(
+                f'------------------------------------------------------------------{TERMINAL_DEFAULT}'
+            )
+
             print()
     else:
         #print(process.stdout.read().decode())
-        print('{}{}{}'.format(TERMINAL_RED, process.stderr.read().decode(), TERMINAL_DEFAULT))
+        print(f'{TERMINAL_RED}{process.stderr.read().decode()}{TERMINAL_DEFAULT}')
         print('------------------------------------------------------------------')
-        print('                   {}Update Error: {}{}{}'.format(TERMINAL_RED, TERMINAL_BLUE, version, TERMINAL_DEFAULT))
+        print(
+            f'                   {TERMINAL_RED}Update Error: {TERMINAL_BLUE}{version}{TERMINAL_DEFAULT}'
+        )
+
         print('------------------------------------------------------------------')
         if not is_fork:
             roll_back_update(roll_back_commit)
@@ -360,7 +398,10 @@ def launch_update_version(version, roll_back_commit, current_version_path, is_fo
             sys.exit(1)
 
 def roll_back_update(roll_back_commit):
-    print('Rolling back to safe commit: {}{}{}'.format(TERMINAL_BLUE ,roll_back_commit, TERMINAL_DEFAULT))
+    print(
+        f'Rolling back to safe commit: {TERMINAL_BLUE}{roll_back_commit}{TERMINAL_DEFAULT}'
+    )
+
     process = subprocess.run(['git', 'checkout', roll_back_commit], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
     if process.returncode == 0:
         output = process.stdout
@@ -373,10 +414,16 @@ def roll_back_update(roll_back_commit):
 
 def aborting_update():
     print()
-    print('{}Aborting ...{}'.format(TERMINAL_RED, TERMINAL_DEFAULT))
-    print('{}******************************************************************'.format(TERMINAL_RED))
+    print(f'{TERMINAL_RED}Aborting ...{TERMINAL_DEFAULT}')
+    print(
+        f'{TERMINAL_RED}******************************************************************'
+    )
+
     print('*                    AIL Not Updated                             *')
-    print('******************************************************************{}'.format(TERMINAL_DEFAULT))
+    print(
+        f'******************************************************************{TERMINAL_DEFAULT}'
+    )
+
     print()
 
 if __name__ == "__main__":
@@ -400,9 +447,15 @@ if __name__ == "__main__":
 
     current_version_path = os.path.join(os.environ['AIL_HOME'], 'update/current_version')
 
-    print('{}******************************************************************'.format(TERMINAL_YELLOW))
+    print(
+        f'{TERMINAL_YELLOW}******************************************************************'
+    )
+
     print('*                        Updating AIL ...                        *')
-    print('******************************************************************{}'.format(TERMINAL_DEFAULT))
+    print(
+        f'******************************************************************{TERMINAL_DEFAULT}'
+    )
+
 
     # manual updates
     parser = argparse.ArgumentParser()
@@ -418,7 +471,7 @@ if __name__ == "__main__":
 
             current_tag = get_git_current_tag(current_version_path)
             print()
-            print('Current Version: {}{}{}'.format( TERMINAL_YELLOW, current_tag, TERMINAL_DEFAULT))
+            print(f'Current Version: {TERMINAL_YELLOW}{current_tag}{TERMINAL_DEFAULT}')
             print()
             list_upper_tags_remote = get_git_upper_tags_remote(current_tag.replace('v', ''), is_fork)
             # new realease
@@ -426,10 +479,10 @@ if __name__ == "__main__":
                 print('New Releases:')
             if is_fork:
                 for upper_tag in list_upper_tags_remote:
-                    print('    {}{}{}'.format(TERMINAL_BLUE, upper_tag[0], TERMINAL_DEFAULT))
+                    print(f'    {TERMINAL_BLUE}{upper_tag[0]}{TERMINAL_DEFAULT}')
             else:
                 for upper_tag in list_upper_tags_remote:
-                    print('    {}{}{}: {}'.format(TERMINAL_BLUE, upper_tag[0], TERMINAL_DEFAULT, upper_tag[1]))
+                    print(f'    {TERMINAL_BLUE}{upper_tag[0]}{TERMINAL_DEFAULT}: {upper_tag[1]}')
             print()
             update_ail(current_tag, list_upper_tags_remote, current_version_path, is_fork)
 
@@ -438,6 +491,9 @@ if __name__ == "__main__":
             aborting_update()
             sys.exit(0)
     else:
-        print('               {}AIL Auto update is disabled{}'.format(TERMINAL_RED, TERMINAL_DEFAULT))
+        print(
+            f'               {TERMINAL_RED}AIL Auto update is disabled{TERMINAL_DEFAULT}'
+        )
+
         aborting_update()
         sys.exit(0)

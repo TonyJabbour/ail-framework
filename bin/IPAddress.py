@@ -35,16 +35,13 @@ def search_ip(message):
     for ip in results:
         ip = '.'.join([str(int(x)) for x in ip.split('.')])
         address = IPv4Address(ip)
-        for network in ip_networks:
-            if address in network:
-                matching_ips.append(address)
-
-    if len(matching_ips) > 0:
-        print('{} contains {} IPs'.format(paste.p_name, len(matching_ips)))
-        publisher.warning('{} contains {} IPs'.format(paste.p_name, len(matching_ips)))
+        matching_ips.extend(address for network in ip_networks if address in network)
+    if matching_ips:
+        print(f'{paste.p_name} contains {len(matching_ips)} IPs')
+        publisher.warning(f'{paste.p_name} contains {len(matching_ips)} IPs')
 
         #Tag message with IP
-        msg = 'infoleak:automatic-detection="ip";{}'.format(message)
+        msg = f'infoleak:automatic-detection="ip";{message}'
         p.populate_set_out(msg, 'Tags')
         #Send to duplicate
         p.populate_set_out(message, 'Duplicate')
@@ -83,7 +80,7 @@ if __name__ == '__main__':
         # Get one message from the input queue
         message = p.get_from_set()
         if message is None:
-            publisher.debug("{} queue is empty, waiting".format(config_section))
+            publisher.debug(f"{config_section} queue is empty, waiting")
             time.sleep(1)
             continue
 

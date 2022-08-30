@@ -63,19 +63,19 @@ def search_crytocurrency(item_id, item_content):
             is_valid_crypto_addr = False
             # validate cryptocurrency address
             for address in crypto_addr:
-                if(Cryptocurrency.verify_cryptocurrency_address(dict_field, address)):
+                if (Cryptocurrency.verify_cryptocurrency_address(dict_field, address)):
                     is_valid_crypto_addr = True
-                    print('{} address found : {}'.format(crypto_name, address))
+                    print(f'{crypto_name} address found : {address}')
                     # build bitcoin correlation
                     Cryptocurrency.cryptocurrency.save_item_correlation(crypto_name, address, item_id, Item.get_item_date(item_id))
 
             # At least one valid cryptocurrency address was found
-            if(is_valid_crypto_addr):
+            if is_valid_crypto_addr:
                 # valid cryptocurrency found in this item
                 is_cryptocurrency_found = True
 
                 # Tag Item
-                msg = '{};{}'.format(crypto_dict['tag'], item_id)
+                msg = f"{crypto_dict['tag']};{item_id}"
                 p.populate_set_out(msg, 'Tags')
 
                 # search cryptocurrency private key
@@ -93,18 +93,22 @@ def search_crytocurrency(item_id, item_content):
 
                     if addr_private_key:
                         # Tag Item
-                        msg = '{};{}'.format(crypto_dict['private_key']['tag'], item_id)
+                        msg = f"{crypto_dict['private_key']['tag']};{item_id}"
                         p.populate_set_out(msg, 'Tags')
 
                         # debug
                         print(addr_private_key)
-                        to_print = '{} found: {} address and {} private Keys'.format(crypto_name, len(crypto_addr), len(addr_private_key))
+                        to_print = f'{crypto_name} found: {len(crypto_addr)} address and {len(addr_private_key)} private Keys'
+
                         print(to_print)
                         publisher.warning(to_print)
 
-                        to_print = 'Cryptocurrency;{};{};{};'.format(Item.get_source(item_id), Item.get_item_date(item_id), Item.get_item_basename(item_id))
-                        publisher.warning('{}Detected {} {} private key;{}'.format(
-                            to_print, len(addr_private_key), crypto_name, item_id))
+                        to_print = f'Cryptocurrency;{Item.get_source(item_id)};{Item.get_item_date(item_id)};{Item.get_item_basename(item_id)};'
+
+                        publisher.warning(
+                            f'{to_print}Detected {len(addr_private_key)} {crypto_name} private key;{item_id}'
+                        )
+
 
 
     if is_cryptocurrency_found:
@@ -195,7 +199,7 @@ if __name__ == "__main__":
         # Get one message from the input queue
         item_id = p.get_from_set()
         if item_id is None:
-            publisher.debug("{} queue is empty, waiting".format(config_section))
+            publisher.debug(f"{config_section} queue is empty, waiting")
             time.sleep(1)
             continue
 

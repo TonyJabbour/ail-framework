@@ -62,7 +62,7 @@ class Zerobins(AbstractModule):
 
         if len(matching_binz) > 0:
             for bin in matching_binz:
-                print("send {} to crawler".format(bin))
+                print(f"send {bin} to crawler")
                 crawlers.create_crawler_task(bin, screenshot=False, har=False, depth_limit=1, max_pages=1, auto_crawler=False, crawler_delta=3600, crawler_type=None, cookiejar_uuid=None, user_agent=None)
 
         self.redis_logger.debug("Compute message in queue")

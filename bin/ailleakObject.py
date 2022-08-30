@@ -65,12 +65,19 @@ class ObjectWrapper:
         result = self.pymisp.search(controller='events', eventinfo=to_search, metadata=False)
         events = []
         if result:
-            for e in result:
-                events.append({'id': e['Event']['id'], 'org_id': e['Event']['org_id'], 'info': e['Event']['info']})
+            events.extend(
+                {
+                    'id': e['Event']['id'],
+                    'org_id': e['Event']['org_id'],
+                    'info': e['Event']['info'],
+                }
+                for e in result
+            )
+
         return events
 
     def get_daily_event_id(self):
-        to_match = "Daily AIL-leaks {}".format(datetime.date.today())
+        to_match = f"Daily AIL-leaks {datetime.date.today()}"
         events = self.get_all_related_events(to_match)
         for dic in events:
             info = dic['info']
@@ -90,7 +97,7 @@ class ObjectWrapper:
         today = datetime.date.today()
         # [0-3]
         distribution = 0
-        info = "Daily AIL-leaks {}".format(today)
+        info = f"Daily AIL-leaks {today}"
         # [0-2]
         analysis = 0
         # [1-4]
@@ -109,8 +116,7 @@ class ObjectWrapper:
         event.published = published
 
         event.add_tag('infoleak:output-format="ail-daily"')
-        existing_event = self.pymisp.add_event(event)
-        return existing_event
+        return self.pymisp.add_event(event)
 
     # Publish object to MISP
     def pushToMISP(self, uuid_ail, item_id, tag):
@@ -124,8 +130,7 @@ class ObjectWrapper:
         if self.paste_object_exist(self.eventID_to_push, item_id):
             # add new tag
             self.tag(self.attribute_to_tag, tag)
-            print(item_id + ' tagged: ' + tag)
-        #create object
+            print(f'{item_id} tagged: {tag}')
         else:
             misp_obj = self.add_new_object(uuid_ail, item_id, tag)
 

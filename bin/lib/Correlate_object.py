@@ -26,16 +26,18 @@ baseurl = config_loader.get_config_str("Notifications", "ail_domain")
 config_loader = None
 
 def is_valid_object_type(object_type):
-    if object_type in ['domain', 'item', 'image', 'decoded', 'pgp', 'cryptocurrency', 'username']:
-        return True
-    else:
-        return False
+    return object_type in [
+        'domain',
+        'item',
+        'image',
+        'decoded',
+        'pgp',
+        'cryptocurrency',
+        'username',
+    ]
 
 def check_correlation_object(object):
-    if object in get_all_correlation_objects():
-        return True
-    else:
-        return False
+    return object in get_all_correlation_objects()
 
 def is_valid_object_subtype(object_type, object_subtype):
     if object_type == 'pgp':
@@ -44,7 +46,7 @@ def is_valid_object_subtype(object_type, object_subtype):
         return Cryptocurrency.cryptocurrency.is_valid_obj_subtype(object_subtype)
     elif object_type == 'username':
         return Username.correlation.is_valid_obj_subtype(object_subtype)
-    elif object_subtype == None:
+    elif object_subtype is None:
         return True
     else:
         return False
@@ -67,7 +69,7 @@ def get_all_correlation_objects():
 def exist_object(object_type, correlation_id, type_id=None): # => work on object level
     if object_type == 'domain':
         return Domain.verify_if_domain_exist(correlation_id)
-    elif object_type == 'paste' or object_type == 'item':
+    elif object_type in ['paste', 'item']:
         return Item.exist_item(correlation_id)
     elif object_type == 'decoded':
         return Decoded.exist_decoded(correlation_id)
@@ -77,7 +79,7 @@ def exist_object(object_type, correlation_id, type_id=None): # => work on object
         return Cryptocurrency.cryptocurrency.exist_correlation(type_id, correlation_id)
     elif object_type == 'username':
         return Username.correlation.exist_correlation(type_id, correlation_id)
-    elif object_type == 'screenshot' or object_type == 'image':
+    elif object_type in ['screenshot', 'image']:
         return Screenshot.exist_screenshot(correlation_id)
     else:
         return False
@@ -86,7 +88,7 @@ def exist_object(object_type, correlation_id, type_id=None): # => work on object
 def get_object_metadata(object_type, correlation_id, type_id=None):
     if object_type == 'domain':
         return Domain.Domain(correlation_id).get_domain_metadata(tags=True)
-    elif object_type == 'paste' or object_type == 'item':
+    elif object_type in ['paste', 'item']:
         return Item.get_item({"id": correlation_id, "date": True, "date_separator": True, "tags": True})[0]
     elif object_type == 'decoded':
         return Decoded.get_decoded_metadata(correlation_id, nb_seen=True, size=True, file_type=True, tag=True)
@@ -96,13 +98,13 @@ def get_object_metadata(object_type, correlation_id, type_id=None):
         return Cryptocurrency.cryptocurrency.get_metadata(type_id, correlation_id)
     elif object_type == 'username':
         return Username.correlation.get_metadata(type_id, correlation_id)
-    elif object_type == 'screenshot' or object_type == 'image':
+    elif object_type in ['screenshot', 'image']:
         return Screenshot.get_metadata(correlation_id)
 
 def get_object_correlation(object_type, value, correlation_names=None, correlation_objects=None, requested_correl_type=None):
     if object_type == 'domain':
         return Domain.get_domain_all_correlation(value, correlation_names=correlation_names)
-    elif object_type == 'paste' or object_type == 'item':
+    elif object_type in ['paste', 'item']:
         return Item.get_item_all_correlation(value, correlation_names=correlation_names)
     elif object_type == 'decoded':
         return Decoded.get_decoded_correlated_object(value, correlation_objects=correlation_objects)
@@ -112,7 +114,7 @@ def get_object_correlation(object_type, value, correlation_names=None, correlati
         return Cryptocurrency.cryptocurrency.get_correlation_all_object(requested_correl_type, value, correlation_objects=correlation_objects)
     elif object_type == 'username':
         return Username.correlation.get_correlation_all_object(requested_correl_type, value, correlation_objects=correlation_objects)
-    elif object_type == 'screenshot' or object_type == 'image':
+    elif object_type in ['screenshot', 'image']:
         return Screenshot.get_screenshot_correlated_object(value, correlation_objects=correlation_objects)
     return {}
 
@@ -138,10 +140,10 @@ def get_correlation_node_icon(correlation_name, correlation_type=None, value=Non
         node_color = '#44AA99'
         if correlation_type == 'key':
             icon_text = '\uf084'
-        elif correlation_type == 'name':
-            icon_text = '\uf507'
         elif correlation_type == 'mail':
             icon_text = '\uf1fa'
+        elif correlation_type == 'name':
+            icon_text = '\uf507'
         else:
             icon_text = 'times'
 
@@ -150,12 +152,12 @@ def get_correlation_node_icon(correlation_name, correlation_type=None, value=Non
         if correlation_type == 'bitcoin':
             icon_class = 'fab'
             icon_text = '\uf15a'
-        elif correlation_type == 'monero':
-            icon_class = 'fab'
-            icon_text = '\uf3d0'
         elif correlation_type == 'ethereum':
             icon_class = 'fab'
             icon_text = '\uf42e'
+        elif correlation_type == 'monero':
+            icon_class = 'fab'
+            icon_text = '\uf3d0'
         else:
             icon_text = '\uf51e'
 
@@ -167,9 +169,6 @@ def get_correlation_node_icon(correlation_name, correlation_type=None, value=Non
         elif correlation_type == 'twitter':
             icon_class = 'fab'
             icon_text = '\uf099'
-        elif correlation_type == 'jabber':
-            icon_class = 'fa'
-            icon_text = '\uf007'
         else:
             icon_class = 'fa'
             icon_text = '\uf007'
@@ -188,7 +187,7 @@ def get_correlation_node_icon(correlation_name, correlation_type=None, value=Non
         else:
             icon_text = '\uf249'
 
-    elif correlation_name == 'screenshot' or correlation_name == 'image':
+    elif correlation_name in ['screenshot', 'image']:
         node_color = '#E1F5DF'
         icon_text = '\uf03e'
 
@@ -203,11 +202,7 @@ def get_correlation_node_icon(correlation_name, correlation_type=None, value=Non
 
     elif correlation_name == 'paste':
         node_radius = 5
-        if Item.is_crawled(value):
-            node_color = 'red'
-        else:
-            node_color = '#332288'
-
+        node_color = 'red' if Item.is_crawled(value) else '#332288'
     return {"icon_class": icon_class, "icon_text": icon_text, "node_color": node_color, "node_radius": node_radius}
 
 # flask_context: if this function is used with a Flask app context
@@ -240,7 +235,7 @@ def get_item_url(correlation_name, value, correlation_type=None, flask_context=T
             url = url_for(endpoint, object_type="decoded", correlation_id=value)
         else:
             url = f'{baseurl}/correlation/show_correlation?object_type={correlation_name}&correlation_id={value}'
-    elif correlation_name == 'screenshot' or correlation_name == 'image':              ### # TODO:  rename me
+    elif correlation_name in ['screenshot', 'image']:              ### # TODO:  rename me
         if flask_context:
             endpoint = 'correlation.show_correlation'
             url = url_for(endpoint, object_type="screenshot", correlation_id=value)
@@ -252,7 +247,7 @@ def get_item_url(correlation_name, value, correlation_type=None, flask_context=T
             url = url_for(endpoint, domain=value)
         else:
             url = f'{baseurl}/crawlers/showDomain?domain={value}'
-    elif correlation_name == 'item' or correlation_name == 'paste':  ### # TODO:  remove paste
+    elif correlation_name in ['item', 'paste']:  ### # TODO:  remove paste
         if flask_context:
             endpoint = 'objects_item.showItem'
             url = url_for(endpoint, id=value)
@@ -297,17 +292,19 @@ def delete_obj_relationship(obj1_type, obj1_id, obj2_type, obj2_id, obj1_subtype
         Screenshot.delete_obj_relationship(obj1_id, obj2_type, obj2_id)
 
 def create_graph_links(links_set):
-    graph_links_list = []
-    for link in links_set:
-        graph_links_list.append({"source": link[0], "target": link[1]})
-    return graph_links_list
+    return [{"source": link[0], "target": link[1]} for link in links_set]
 
 def create_graph_nodes(nodes_set, root_node_id, flask_context=True):
     graph_nodes_list = []
     for node_id in nodes_set:
         correlation_name, correlation_type, value = node_id.split(';', 3)
-        dict_node = {"id": node_id}
-        dict_node['style'] = get_correlation_node_icon(correlation_name, correlation_type, value)
+        dict_node = {
+            "id": node_id,
+            'style': get_correlation_node_icon(
+                correlation_name, correlation_type, value
+            ),
+        }
+
         dict_node['text'] = value
         if node_id == root_node_id:
             dict_node["style"]["node_color"] = 'orange'
@@ -319,18 +316,15 @@ def create_graph_nodes(nodes_set, root_node_id, flask_context=True):
 def create_node_id(correlation_name, value, correlation_type=''):
     if correlation_type is None:
         correlation_type = ''
-    return '{};{};{}'.format(correlation_name, correlation_type, value)
+    return f'{correlation_name};{correlation_type};{value}'
 
 
 
 # # TODO: filter by correlation type => bitcoin, mail, ...
 def get_graph_node_object_correlation(object_type, root_value, mode, correlation_names, correlation_objects, max_nodes=300, requested_correl_type=None, flask_context=True):
     links = set()
-    nodes = set()
-
     root_node_id = create_node_id(object_type, root_value, requested_correl_type)
-    nodes.add(root_node_id)
-
+    nodes = {root_node_id}
     root_correlation = get_object_correlation(object_type, root_value, correlation_names, correlation_objects, requested_correl_type=requested_correl_type)
     for correl in root_correlation:
         if correl in ('pgp', 'cryptocurrency', 'username'):
@@ -346,9 +340,13 @@ def get_graph_node_object_correlation(object_type, root_value, mode, correlation
                         nodes.add(correl_node_id)
                         links.add((root_node_id, correl_node_id))
 
-                    # get second correlation
-                    res = get_object_correlation(correl, correl_val, correlation_names, correlation_objects, requested_correl_type=correl_type)
-                    if res:
+                    if res := get_object_correlation(
+                        correl,
+                        correl_val,
+                        correlation_names,
+                        correlation_objects,
+                        requested_correl_type=correl_type,
+                    ):
                         for corr_obj in res:
                             for correl_key_val in res[corr_obj]:
                                 #filter root value
@@ -376,8 +374,9 @@ def get_graph_node_object_correlation(object_type, root_value, mode, correlation
                     nodes.add(correl_node_id)
                     links.add((root_node_id, correl_node_id))
 
-                res = get_object_correlation(correl, correl_val, correlation_names, correlation_objects)
-                if res:
+                if res := get_object_correlation(
+                    correl, correl_val, correlation_names, correlation_objects
+                ):
                     for corr_obj in res:
                         if corr_obj in ('decoded', 'domain', 'paste', 'screenshot'):
                             for correl_key_val in res[corr_obj]:
@@ -422,36 +421,30 @@ def get_graph_node_object_correlation(object_type, root_value, mode, correlation
 
 def get_obj_global_id(obj_type, obj_id, obj_sub_type=None):
     if obj_sub_type:
-        return '{}:{}:{}'.format(obj_type, obj_sub_type, obj_id)
-    else:
-        # # TODO: remove me
-        if obj_type=='paste':
-            obj_type='item'
-        # # TODO: remove me
-        if obj_type=='screenshot':
-            obj_type='image'
+        return f'{obj_type}:{obj_sub_type}:{obj_id}'
+    # # TODO: remove me
+    if obj_type=='paste':
+        obj_type='item'
+    # # TODO: remove me
+    if obj_type=='screenshot':
+        obj_type='image'
 
-        return '{}:{}'.format(obj_type, obj_id)
+    return f'{obj_type}:{obj_id}'
 
 def get_global_id_from_id(global_id):
-    obj_meta = {}
     global_id = global_id.split(':', 3)
+    obj_meta = {'type': global_id[0]}
     if len(global_id) > 2:
-        obj_meta['type'] = global_id[0]
         obj_meta['subtype'] = global_id[1]
         obj_meta['id'] = global_id[2]
     else:
-        obj_meta['type'] = global_id[0]
         obj_meta['subtype'] = None
         obj_meta['id'] = global_id[1]
     return obj_meta
 
 # used by UI
 def get_obj_str_type_subtype(obj_type, obj_subtype):
-    if obj_subtype:
-        return '{};{}'.format(obj_type, obj_subtype)
-    else:
-        return obj_type
+    return f'{obj_type};{obj_subtype}' if obj_subtype else obj_type
 
 def sanitise_correlation_names(correlation_names):
     '''
@@ -460,15 +453,13 @@ def sanitise_correlation_names(correlation_names):
     all_correlation_names = get_all_correlation_names()
     if correlation_names is None:
         return all_correlation_names
-    else:
-        l_correlation_names = []
-        for correl in correlation_names.split(','):
-            if correl in all_correlation_names:
-                l_correlation_names.append(correl)
-        if l_correlation_names:
-            return l_correlation_names
-        else:
-            return all_correlation_names
+    l_correlation_names = [
+        correl
+        for correl in correlation_names.split(',')
+        if correl in all_correlation_names
+    ]
+
+    return l_correlation_names or all_correlation_names
 
 def sanitise_correlation_objects(correlation_objects):
     '''
@@ -477,15 +468,13 @@ def sanitise_correlation_objects(correlation_objects):
     all_correlation_objects = get_all_correlation_objects()
     if correlation_objects is None:
         return all_correlation_objects
-    else:
-        l_correlation_objects = []
-        for correl in correlation_objects.split(','):
-            if correl in all_correlation_objects:
-                l_correlation_objects.append(correl)
-        if l_correlation_objects:
-            return l_correlation_objects
-        else:
-            return all_correlation_objects
+    l_correlation_objects = [
+        correl
+        for correl in correlation_objects.split(',')
+        if correl in all_correlation_objects
+    ]
+
+    return l_correlation_objects or all_correlation_objects
 
 ######## API EXPOSED ########
 def api_check_correlation_objects(l_object):

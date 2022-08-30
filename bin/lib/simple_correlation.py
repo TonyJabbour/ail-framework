@@ -29,70 +29,78 @@ class SimpleCorrelation(object): #social_name
         self.correlation_name = correlation_name
 
     def exist_correlation(self, obj_id):
-        res = r_serv_metadata.zscore('s_correl:{}:all'.format(self.correlation_name), obj_id)
-        if res is not None:
-            return True
-        else:
-            return False
+        res = r_serv_metadata.zscore(f's_correl:{self.correlation_name}:all', obj_id)
+        return res is not None
 
     def _get_items(self, obj_id):
-        res =  r_serv_metadata.smembers('s_correl:set_item_{}:{}'.format(self.correlation_name, obj_id))
-        if res:
+        if res := r_serv_metadata.smembers(
+            f's_correl:set_item_{self.correlation_name}:{obj_id}'
+        ):
             return list(res)
         else:
             return []
 
     def get_correlation_first_seen(self, obj_id, r_int=False):
-        res = r_serv_metadata.hget('s_correl:{}:metadata:{}'.format(self.correlation_name, obj_id), 'first_seen')
+        res = r_serv_metadata.hget(
+            f's_correl:{self.correlation_name}:metadata:{obj_id}', 'first_seen'
+        )
+
         if r_int:
-            if res:
-                return int(res)
-            else:
-                return 99999999
+            return int(res) if res else 99999999
         else:
             return res
 
     def get_correlation_last_seen(self, obj_id, r_int=False):
-        res = r_serv_metadata.hget('s_correl:{}:metadata:{}'.format(self.correlation_name, obj_id), 'last_seen')
+        res = r_serv_metadata.hget(
+            f's_correl:{self.correlation_name}:metadata:{obj_id}', 'last_seen'
+        )
+
         if r_int:
-            if res:
-                return int(res)
-            else:
-                return 0
+            return int(res) if res else 0
         else:
             return res
 
     def _get_metadata(self, obj_id):
-        meta_dict = {}
-        meta_dict['first_seen'] = self.get_correlation_first_seen(obj_id)
+        meta_dict = {'first_seen': self.get_correlation_first_seen(obj_id)}
         meta_dict['last_seen'] = self.get_correlation_last_seen(obj_id)
-        meta_dict['nb_seen'] = r_serv_metadata.scard('s_correl:set_item_{}:{}'.format(self.correlation_name, obj_id))
+        meta_dict['nb_seen'] = r_serv_metadata.scard(
+            f's_correl:set_item_{self.correlation_name}:{obj_id}'
+        )
+
         return meta_dict
 
     def get_metadata(self, correlation_type, field_name, date_format='str_date'):
         meta_dict = self._get_metadata(obj_id)
         if date_format == "str_date":
             if meta_dict['first_seen']:
-                meta_dict['first_seen'] = '{}/{}/{}'.format(meta_dict['first_seen'][0:4], meta_dict['first_seen'][4:6], meta_dict['first_seen'][6:8])
+                meta_dict[
+                    'first_seen'
+                ] = f"{meta_dict['first_seen'][:4]}/{meta_dict['first_seen'][4:6]}/{meta_dict['first_seen'][6:8]}"
+
             if meta_dict['last_seen']:
-                meta_dict['last_seen'] = '{}/{}/{}'.format(meta_dict['last_seen'][0:4], meta_dict['last_seen'][4:6], meta_dict['last_seen'][6:8])
+                meta_dict[
+                    'last_seen'
+                ] = f"{meta_dict['last_seen'][:4]}/{meta_dict['last_seen'][4:6]}/{meta_dict['last_seen'][6:8]}"
+
         return meta_dict
 
     def get_nb_object_seen_by_date(self, obj_id, date_day):
-        nb = r_serv_metadata.zscore('s_correl:date:{}:{}'.format(self.correlation_name, date_day), obj_id)
-        if nb is None:
-            return 0
-        else:
-            return int(nb)
+        nb = r_serv_metadata.zscore(
+            f's_correl:date:{self.correlation_name}:{date_day}', obj_id
+        )
+
+        return 0 if nb is None else int(nb)
 
     def get_list_nb_previous_correlation_object(self, obj_id, numDay):
-        nb_previous_correlation = []
-        for date_day in Date.get_previous_date_list(numDay):
-            nb_previous_correlation.append(self.get_nb_object_seen_by_date(obj_id, date_day))
-        return nb_previous_correlation
+        return [
+            self.get_nb_object_seen_by_date(obj_id, date_day)
+            for date_day in Date.get_previous_date_list(numDay)
+        ]
 
     def _get_correlation_by_date(self, date_day):
-        return r_serv_metadata.zrange('s_correl:date:{}:{}'.format(self.correlation_name, date_day), 0, -1)
+        return r_serv_metadata.zrange(
+            f's_correl:date:{self.correlation_name}:{date_day}', 0, -1
+        )
 
     # def verify_correlation_field_request(self, request_dict, correlation_type, item_type='paste'):
     #     if not request_dict:
@@ -126,8 +134,9 @@ class SimpleCorrelation(object): #social_name
         :return: a list of correlation
         :rtype: list
         '''
-        res = r_serv_metadata.smembers('domain:s_correl:{}:{}'.format(self.correlation_name, domain))
-        if res:
+        if res := r_serv_metadata.smembers(
+            f'domain:s_correl:{self.correlation_name}:{domain}'
+        ):
             return list(res)
         else:
             return []
@@ -144,8 +153,9 @@ class SimpleCorrelation(object): #social_name
         :return: a list of correlation
         :rtype: list
         '''
-        res = r_serv_metadata.smembers('s_correl:set_domain_{}:{}'.format(self.correlation_name, correlation_id))
-        if res:
+        if res := r_serv_metadata.smembers(
+            f's_correl:set_domain_{self.correlation_name}:{correlation_id}'
+        ):
             return list(res)
         else:
             return []
@@ -160,8 +170,9 @@ class SimpleCorrelation(object): #social_name
         :return: a list of correlation
         :rtype: list
         '''
-        res = r_serv_metadata.smembers('item:s_correl:{}:{}'.format(self.correlation_name, item_id))
-        if res:
+        if res := r_serv_metadata.smembers(
+            f'item:s_correl:{self.correlation_name}:{item_id}'
+        ):
             return list(res)
         else:
             return []
@@ -184,30 +195,60 @@ class SimpleCorrelation(object): #social_name
     def update_correlation_daterange(self, obj_id, date):
         date = int(date)
         # obj_id don't exit
-        if not r_serv_metadata.exists('s_correl:{}:metadata:{}'.format(self.correlation_name, obj_id)):
-            r_serv_metadata.hset('s_correl:{}:metadata:{}'.format(self.correlation_name, obj_id), 'first_seen', date)
-            r_serv_metadata.hset('s_correl:{}:metadata:{}'.format(self.correlation_name, obj_id), 'last_seen', date)
+        if not r_serv_metadata.exists(
+            f's_correl:{self.correlation_name}:metadata:{obj_id}'
+        ):
+            r_serv_metadata.hset(
+                f's_correl:{self.correlation_name}:metadata:{obj_id}',
+                'first_seen',
+                date,
+            )
+
+            r_serv_metadata.hset(
+                f's_correl:{self.correlation_name}:metadata:{obj_id}',
+                'last_seen',
+                date,
+            )
+
         else:
             first_seen = self.get_correlation_last_seen(obj_id, r_int=True)
             last_seen = self.get_correlation_first_seen(obj_id, r_int=True)
             if date < first_seen:
-                r_serv_metadata.hset('s_correl:{}:metadata:{}'.format(self.correlation_name, obj_id), 'first_seen', date)
+                r_serv_metadata.hset(
+                    f's_correl:{self.correlation_name}:metadata:{obj_id}',
+                    'first_seen',
+                    date,
+                )
+
             if date > last_seen:
-                r_serv_metadata.hset('s_correl:{}:metadata:{}'.format(self.correlation_name, obj_id), 'last_seen', date)
+                r_serv_metadata.hset(
+                    f's_correl:{self.correlation_name}:metadata:{obj_id}',
+                    'last_seen',
+                    date,
+                )
 
     def save_item_correlation(self, obj_id, item_id, item_date):
         self.update_correlation_daterange(obj_id, item_date)
         # global set
-        r_serv_metadata.sadd('s_correl:set_item_{}:{}'.format(self.correlation_name, obj_id), item_id)
+        r_serv_metadata.sadd(
+            f's_correl:set_item_{self.correlation_name}:{obj_id}', item_id
+        )
+
 
         # daily
-        r_serv_metadata.zincrby('s_correl:date:{}:{}'.format(self.correlation_name, item_date), obj_id, 1)
+        r_serv_metadata.zincrby(
+            f's_correl:date:{self.correlation_name}:{item_date}', obj_id, 1
+        )
+
 
         # all correlation
-        r_serv_metadata.zincrby('s_correl:{}:all'.format(self.correlation_name), obj_id, 1)
+        r_serv_metadata.zincrby(f's_correl:{self.correlation_name}:all', obj_id, 1)
 
         # item
-        r_serv_metadata.sadd('item:s_correl:{}:{}'.format(self.correlation_name, item_id), obj_id)
+        r_serv_metadata.sadd(
+            f'item:s_correl:{self.correlation_name}:{item_id}', obj_id
+        )
+
 
         # domain
         if Item.is_crawled(item_id):
@@ -216,29 +257,51 @@ class SimpleCorrelation(object): #social_name
 
     def delete_item_correlation(self, subtype, obj_id, item_id, item_date):
         #self.update_correlation_daterange ! # # TODO:
-        r_serv_metadata.srem('s_correl:set_item_{}:{}'.format(self.correlation_name, obj_id), item_id)
-        r_serv_metadata.srem('item:s_correl:{}:{}'.format(self.correlation_name, item_id), obj_id)
+        r_serv_metadata.srem(
+            f's_correl:set_item_{self.correlation_name}:{obj_id}', item_id
+        )
 
-        res = r_serv_metadata.zincrby('s_correl:date:{}:{}'.format(self.correlation_name, item_date), obj_id, -1)
+        r_serv_metadata.srem(
+            f'item:s_correl:{self.correlation_name}:{item_id}', obj_id
+        )
+
+
+        res = r_serv_metadata.zincrby(
+            f's_correl:date:{self.correlation_name}:{item_date}', obj_id, -1
+        )
+
         if int(res) < 0: # remove last
-            r_serv_metadata.zrem('s_correl:date:{}:{}'.format(self.correlation_name, item_date), obj_id)
+            r_serv_metadata.zrem(
+                f's_correl:date:{self.correlation_name}:{item_date}', obj_id
+            )
 
-        res = r_serv_metadata.zscore('s_correl:{}:all'.format(self.correlation_name), obj_id)
+
+        res = r_serv_metadata.zscore(f's_correl:{self.correlation_name}:all', obj_id)
         if int(res) > 0:
-            r_serv_metadata.zincrby('s_correl:{}:all'.format(self.correlation_name), obj_id, -1)
+            r_serv_metadata.zincrby(f's_correl:{self.correlation_name}:all', obj_id, -1)
 
     def save_domain_correlation(self, domain, obj_id):
-        r_serv_metadata.sadd('domain:s_correl:{}:{}'.format(self.correlation_name, domain), obj_id)
-        r_serv_metadata.sadd('s_correl:set_domain_{}:{}'.format(self.correlation_name, obj_id), domain)
+        r_serv_metadata.sadd(
+            f'domain:s_correl:{self.correlation_name}:{domain}', obj_id
+        )
+
+        r_serv_metadata.sadd(
+            f's_correl:set_domain_{self.correlation_name}:{obj_id}', domain
+        )
 
     def delete_domain_correlation(self, domain, obj_id):
-        r_serv_metadata.srem('domain:s_correl:{}:{}'.format(self.correlation_name, domain), obj_id)
-        r_serv_metadata.srem('s_correl:set_domain_{}:{}'.format(self.correlation_name, obj_id), domain)
+        r_serv_metadata.srem(
+            f'domain:s_correl:{self.correlation_name}:{domain}', obj_id
+        )
+
+        r_serv_metadata.srem(
+            f's_correl:set_domain_{self.correlation_name}:{obj_id}', domain
+        )
 
     ######
 
     def save_correlation(self, obj_id, date_range):
-        r_serv_metadata.zincrby('s_correl:{}:all'.format(self.correlation_name), obj_id, 0)
+        r_serv_metadata.zincrby(f's_correl:{self.correlation_name}:all', obj_id, 0)
         self.update_correlation_daterange(obj_id, date_range['date_from'])
         if date_range['date_from'] != date_range['date_to']:
             self.update_correlation_daterange(obj_id, date_range['date_to'])

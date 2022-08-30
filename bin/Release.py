@@ -51,15 +51,8 @@ if __name__ == "__main__":
         #signal.alarm(max_execution_time)
         try:
             releases = set(re.findall(regex, content))
-            if len(releases) == 0:
+            if not releases:
                 continue
-
-                to_print = 'Release;{};{};{};{} releases;{}'.format(paste.p_source, paste.p_date, paste.p_name, len(releases), paste.p_rel_path)
-                print(to_print)
-                if len(releases) > 30:
-                    publisher.warning(to_print)
-                else:
-                    publisher.info(to_print)
 
         except TimeoutException:
             p.incr_module_timeout_statistic()

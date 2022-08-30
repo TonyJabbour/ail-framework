@@ -7,6 +7,7 @@ The JSON Receiver Module
 Recieve Json Items (example: Twitter feeder)
 
 """
+
 import os
 import json
 import redis
@@ -45,12 +46,10 @@ if __name__ == '__main__':
 
     while True:
 
-        json_item = importer.get_json_item_to_import()
-        if json_item:
-
+        if json_item := importer.get_json_item_to_import():
             json_item = json.loads(json_item)
             feeder_name = importer.get_json_source(json_item)
-            print('importing: {} feeder'.format(feeder_name))
+            print(f'importing: {feeder_name} feeder')
 
             json_import_class = importer.get_json_receiver_class(feeder_name)
             importer_obj = json_import_class(feeder_name, json_item)

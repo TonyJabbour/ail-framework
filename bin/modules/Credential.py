@@ -96,10 +96,14 @@ class Credential(AbstractModule):
 
         item_content = item.get_content()
 
-        # Extract all credentials
-        all_credentials = regex_helper.regex_findall(self.module_name, self.redis_cache_key, self.regex_cred, item.get_id(), item_content, max_time=self.max_execution_time)
-
-        if all_credentials:
+        if all_credentials := regex_helper.regex_findall(
+            self.module_name,
+            self.redis_cache_key,
+            self.regex_cred,
+            item.get_id(),
+            item_content,
+            max_time=self.max_execution_time,
+        ):
             nb_cred = len(all_credentials)
             message = f'Checked {nb_cred} credentials found.'
 
@@ -129,7 +133,7 @@ class Credential(AbstractModule):
 
                 for site in site_occurence:
                     site_domain = site[1:-1].lower()
-                    if site_domain in creds_sites.keys():
+                    if site_domain in creds_sites:
                         creds_sites[site_domain] += 1
                     else:
                         creds_sites[site_domain] = 1
@@ -142,7 +146,7 @@ class Credential(AbstractModule):
                         domain = domain.decode()
                     except:
                         pass
-                    if domain in creds_sites.keys():
+                    if domain in creds_sites:
                         creds_sites[domain] += 1
                     else:
                         creds_sites[domain] = 1
@@ -167,7 +171,7 @@ class Credential(AbstractModule):
                         tld = tld.decode()
                     except:
                         pass
-                    self.server_statistics.hincrby('credential_by_tld:'+date, tld, 1)
+                    self.server_statistics.hincrby(f'credential_by_tld:{date}', tld, 1)
             else:
                 self.redis_logger.info(to_print)
                 print(f'found {nb_cred} credentials')
@@ -190,7 +194,11 @@ class Credential(AbstractModule):
                     self.server_cred.hmset(Credential.REDIS_KEY_ALL_CRED_SET_REV, {uniq_num_cred: cred})
 
                 # Add the mapping between the credential and the path
-                self.server_cred.sadd(Credential.REDIS_KEY_MAP_CRED_TO_PATH+'_'+str(uniq_num_cred), uniq_num_path)
+                self.server_cred.sadd(
+                    f'{Credential.REDIS_KEY_MAP_CRED_TO_PATH}_{str(uniq_num_cred)}',
+                    uniq_num_path,
+                )
+
 
                 # Split credentials on capital letters, numbers, dots and so on
                 # Add the split to redis, each split point towards its initial credential unique number

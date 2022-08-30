@@ -36,10 +36,7 @@ class Domain(AbstractObject):
     #     return payload
 
     def get_domain_type(self):
-        if str(self.id).endswith('.onion'):
-            return 'onion'
-        else:
-            return 'regular'
+        return 'onion' if str(self.id).endswith('.onion') else 'regular'
 
     # # WARNING: UNCLEAN DELETE /!\ TEST ONLY /!\
     def delete(self):
@@ -47,11 +44,11 @@ class Domain(AbstractObject):
         pass
 
     def get_link(self, flask_context=False):
-        if flask_context:
-            url = url_for('crawler_splash.showDomain', domain=self.id)
-        else:
-            url = f'{baseurl}/crawlers/showDomain?domain={self.id}'
-        return url
+        return (
+            url_for('crawler_splash.showDomain', domain=self.id)
+            if flask_context
+            else f'{baseurl}/crawlers/showDomain?domain={self.id}'
+        )
 
     def get_svg_icon(self):
         color = '#3DA760'

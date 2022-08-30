@@ -8,6 +8,7 @@ module
 This module send tagged pastes to MISP or THE HIVE Project
 
 """
+
 import os
 import sys
 import uuid
@@ -44,10 +45,7 @@ except:
 # import The Hive Keys
 try:
     from theHiveKEYS import the_hive_url, the_hive_key, the_hive_verifycert
-    if the_hive_url == '':
-        flag_the_hive = False
-    else:
-        flag_the_hive = True
+    flag_the_hive = the_hive_url != ''
 except:
     print('The HIVE keys not present')
     flag_the_hive = False
@@ -65,24 +63,24 @@ def create_the_hive_alert(source, item_id, tag):
     # # TODO: check items status (processed by all modules)
     # # TODO: add item metadata: decoded content, link to auto crawled content, pgp correlation, cryptocurrency correlation...
     # # # TODO: description, add AIL link:show items ?
-    tags = list( r_serv_metadata.smembers('tag:{}'.format(item_id)) )
+    tags = list(r_serv_metadata.smembers(f'tag:{item_id}'))
 
     path = item_basic.get_item_filepath(item_id)
     paste_handle = open(path, 'rb')
     paste_data = paste_handle.read()
     tmp_path = None
 
-    if is_gzip_file(paste_data[0:2]): # if gzip, create a new file to supply to TheHive
-      paste_handle.close()            # TheHive expects a file handle, that's why we create a new file
-      tmp_data = gzip.decompress(paste_data)
-      tmp_path = path + '.unzip'
-      with open(tmp_path, 'wb+') as f:
-        f.write(tmp_data)
-      paste_handle = open(tmp_path, 'rb')
-      if path.endswith(".gz"): # remove .gz from submitted path to TheHive beause we've decompressed it
-        path = path[:-3]
+    if is_gzip_file(paste_data[:2]): # if gzip, create a new file to supply to TheHive
+        paste_handle.close()            # TheHive expects a file handle, that's why we create a new file
+        tmp_data = gzip.decompress(paste_data)
+        tmp_path = f'{path}.unzip'
+        with open(tmp_path, 'wb+') as f:
+          f.write(tmp_data)
+        paste_handle = open(tmp_path, 'rb')
+        if path.endswith(".gz"): # remove .gz from submitted path to TheHive beause we've decompressed it
+          path = path[:-3]
 
-    path = os.path.basename(os.path.normpath(path)) + ".txt" # get last part of path, add .txt so it's easier to open when downloaded from TheHive
+    path = f"{os.path.basename(os.path.normpath(path))}.txt"
 
     artifacts = [
         AlertArtifact( dataType='uuid-ail', data=r_serv_db.get('ail:uuid') ),
@@ -90,15 +88,18 @@ def create_the_hive_alert(source, item_id, tag):
     ]
 
     # Prepare the sample Alert
-    sourceRef = str(uuid.uuid4())[0:6]
-    alert = Alert(title='AIL Leak',
-                  tlp=3,
-                  tags=tags,
-                  description='AIL Leak, triggered by {}'.format(tag),
-                  type='ail',
-                  source=source,
-                  sourceRef=sourceRef,
-                  artifacts=artifacts)
+    sourceRef = str(uuid.uuid4())[:6]
+    alert = Alert(
+        title='AIL Leak',
+        tlp=3,
+        tags=tags,
+        description=f'AIL Leak, triggered by {tag}',
+        type='ail',
+        source=source,
+        sourceRef=sourceRef,
+        artifacts=artifacts,
+    )
+
 
     # Create the Alert
     id = None
@@ -110,7 +111,7 @@ def create_the_hive_alert(source, item_id, tag):
             print('')
             id = response.json()['id']
         else:
-            print('ko: {}/{}'.format(response.status_code, response.text))
+            print(f'ko: {response.status_code}/{response.text}')
             return 0
     except:
         print('hive connection error')
@@ -128,12 +129,10 @@ def feeder(message, count=0):
         if not item_basic.exist_item(item_id):
             if count < 10:
                 r_serv_db.zincrby('mess_not_saved_export', message, 1)
-                return 0
             else:
                 r_serv_db.zrem('mess_not_saved_export', message)
-                print('Error: {} do not exist, tag= {}'.format(item_id, tag))
-                return 0
-
+                print(f'Error: {item_id} do not exist, tag= {tag}')
+            return 0
         source = item_basic.get_source(item_id)
 
         if HiveApi != False:
@@ -142,12 +141,12 @@ def feeder(message, count=0):
                     create_the_hive_alert(source, item_id, tag)
             else:
                 print('hive, auto alerts creation disable')
-        if flag_misp:
-            if int(r_serv_db.get('misp:auto-events')) == 1:
-                if r_serv_db.sismember('whitelist_misp', tag):
-                    misp_wrapper.pushToMISP(uuid_ail, item_id, tag)
-            else:
-                print('misp, auto events creation disable')
+    if flag_misp:
+        if int(r_serv_db.get('misp:auto-events')) == 1:
+            if r_serv_db.sismember('whitelist_misp', tag):
+                misp_wrapper.pushToMISP(uuid_ail, item_id, tag)
+        else:
+            print('misp, auto events creation disable')
 
 
 if __name__ == "__main__":
@@ -184,16 +183,16 @@ if __name__ == "__main__":
             r_serv_db.set('ail:misp', False)
             print('Not connected to MISP')
 
-        if flag_misp:
-            #try:
-            misp_wrapper = ailleakObject.ObjectWrapper(pymisp)
-            r_serv_db.set('ail:misp', True)
-            print('Connected to MISP:', misp_url)
-            #except Exception as e:
-            #    flag_misp = False
-            #    r_serv_db.set('ail:misp', False)
-            #    print(e)
-            #    print('Not connected to MISP')
+    if flag_misp:
+        #try:
+        misp_wrapper = ailleakObject.ObjectWrapper(pymisp)
+        r_serv_db.set('ail:misp', True)
+        print('Connected to MISP:', misp_url)
+        #except Exception as e:
+        #    flag_misp = False
+        #    r_serv_db.set('ail:misp', False)
+        #    print(e)
+        #    print('Not connected to MISP')
 
     # create The HIVE connection
     if flag_the_hive:
@@ -207,7 +206,7 @@ if __name__ == "__main__":
     else:
         HiveApi = False
 
-    if HiveApi != False and flag_the_hive:
+    if HiveApi and flag_the_hive:
         try:
             HiveApi.get_alert(0)
             r_serv_db.set('ail:thehive', True)
@@ -238,12 +237,12 @@ if __name__ == "__main__":
                 list_queu = r_serv_db.zrange('mess_not_saved_export', 0, -1,  withscores=True)
 
                 if num_queu and list_queu:
-                    for i in range(0, num_queu):
+                    for i in range(num_queu):
                         feeder(list_queu[i][0],list_queu[i][1])
 
                 time_1 = time.time()
             else:
-                publisher.debug("{} queue is empty, waiting 1s".format(config_section))
+                publisher.debug(f"{config_section} queue is empty, waiting 1s")
                 time.sleep(1)
         else:
             feeder(message)
