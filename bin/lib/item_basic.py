@@ -24,10 +24,7 @@ config_loader = None
 
 def exist_item(item_id):
     filename = get_item_filepath(item_id)
-    if os.path.isfile(filename):
-        return True
-    else:
-        return False
+    return bool(os.path.isfile(filename))
 
 def get_item_filepath(item_id):
     filename = os.path.join(PASTES_FOLDER, item_id)
@@ -36,9 +33,9 @@ def get_item_filepath(item_id):
 def get_item_date(item_id, add_separator=False):
     l_directory = item_id.split('/')
     if add_separator:
-        return '{}/{}/{}'.format(l_directory[-4], l_directory[-3], l_directory[-2])
+        return f'{l_directory[-4]}/{l_directory[-3]}/{l_directory[-2]}'
     else:
-        return '{}{}{}'.format(l_directory[-4], l_directory[-3], l_directory[-2])
+        return f'{l_directory[-4]}{l_directory[-3]}{l_directory[-2]}'
 
 def get_basename(item_id):
     return os.path.basename(item_id)
@@ -78,56 +75,43 @@ def get_item_mimetype(item_id):
 
 #### TREE CHILD/FATHER ####
 def is_father(item_id):
-    return r_serv_metadata.exists('paste_children:{}'.format(item_id))
+    return r_serv_metadata.exists(f'paste_children:{item_id}')
 
 def is_children(item_id):
-    return r_serv_metadata.hexists('paste_metadata:{}'.format(item_id), 'father')
+    return r_serv_metadata.hexists(f'paste_metadata:{item_id}', 'father')
 
 def is_root_node(item_id):
-    if is_father(item_id) and not is_children(item_id):
-        return True
-    else:
-        return False
+    return bool(is_father(item_id) and not is_children(item_id))
 
 def is_node(item_id):
-    if is_father(item_id) or is_children(item_id):
-        return True
-    else:
-        return False
+    return bool(is_father(item_id) or is_children(item_id))
 
 def is_leaf(item_id):
-    if not is_father(item_id) and is_children(item_id):
-        return True
-    else:
-        return False
+    return bool(not is_father(item_id) and is_children(item_id))
 
 def is_domain_root(item_id):
     if not is_crawled(item_id):
         return False
-    else:
-        domain = get_item_domain(item_id)
-        item_father = get_item_parent(item_id)
-        if not is_crawled(item_father):
-            return True
-        else:
-            # same domain
-            if get_item_domain(item_father) == domain:
-                return False
-            else:
-                return True
+    domain = get_item_domain(item_id)
+    item_father = get_item_parent(item_id)
+    return (
+        get_item_domain(item_father) != domain
+        if is_crawled(item_father)
+        else True
+    )
 
 def get_item_url(item_id):
     return r_serv_metadata.hget(f'paste_metadata:{item_id}', 'real_link')
 
 def get_nb_children(item_id):
-    return r_serv_metadata.scard('paste_children:{}'.format(item_id))
+    return r_serv_metadata.scard(f'paste_children:{item_id}')
 
 
 def get_item_parent(item_id):
-    return r_serv_metadata.hget('paste_metadata:{}'.format(item_id), 'father')
+    return r_serv_metadata.hget(f'paste_metadata:{item_id}', 'father')
 
 def get_item_children(item_id):
-    return list(r_serv_metadata.smembers('paste_children:{}'.format(item_id)))
+    return list(r_serv_metadata.smembers(f'paste_children:{item_id}'))
 
 # # TODO:  handle domain last origin in domain lib
 def _delete_node(item_id):
@@ -135,8 +119,8 @@ def _delete_node(item_id):
     #if is_crawled(item_id):
     #    r_serv_metadata.hrem('paste_metadata:{}'.format(item_id), 'real_link')
     for children_id in get_item_children(item_id):
-        r_serv_metadata.hdel('paste_metadata:{}'.format(children_id), 'father')
-    r_serv_metadata.delete('paste_children:{}'.format(item_id))
+        r_serv_metadata.hdel(f'paste_metadata:{children_id}', 'father')
+    r_serv_metadata.delete(f'paste_children:{item_id}')
 
     # delete regular
         # simple if leaf
@@ -155,13 +139,12 @@ def get_all_domain_node_by_item_id(item_id, l_nodes=[]):
 
 
 def add_item_parent_by_parent_id(parent_type, parent_id, item_id):
-    parent_item_id = get_obj_id_item_id(parent_type, parent_id)
-    if parent_item_id:
+    if parent_item_id := get_obj_id_item_id(parent_type, parent_id):
         add_item_parent(parent_item_id, item_id)
 
 def add_item_parent(parent_item_id, item_id):
-    r_serv_metadata.hset('paste_metadata:{}'.format(item_id), 'father', parent_item_id)
-    r_serv_metadata.sadd('paste_children:{}'.format(parent_item_id), item_id)
+    r_serv_metadata.hset(f'paste_metadata:{item_id}', 'father', parent_item_id)
+    r_serv_metadata.sadd(f'paste_children:{parent_item_id}', item_id)
     return True
 
 # TODO:
@@ -171,7 +154,7 @@ def add_item_parent(parent_item_id, item_id):
 def get_obj_id_item_id(parent_type, parent_id):
     all_parents_type = ['twitter_id', 'jabber_id', 'telegram_id']
     if parent_type in all_parents_type:
-        return r_serv_metadata.hget('map:{}:item_id'.format(parent_type), parent_id)
+        return r_serv_metadata.hget(f'map:{parent_type}:item_id', parent_id)
     else:
         return None
 
@@ -195,31 +178,28 @@ def _get_dir_source_name(directory, source_name=None, l_sources_name=set(), filt
         l_dir = os.listdir(os.path.join(directory, source_name))
     else:
         l_dir = os.listdir(directory)
-    # empty directory
     if not l_dir:
         return l_sources_name.add(source_name)
-    else:
-        for src_name in l_dir:
-            if len(src_name) == 4:
-                #try:
-                int(src_name)
-                to_add = os.path.join(source_name)
-                # filter sources, remove first directory
-                if filter_dir:
-                    to_add = to_add.replace('archive/', '').replace('alerts/', '')
-                l_sources_name.add(to_add)
-                return l_sources_name
-                #except:
-                #    pass
-            if source_name:
-                src_name = os.path.join(source_name, src_name)
-            l_sources_name = _get_dir_source_name(directory, source_name=src_name, l_sources_name=l_sources_name, filter_dir=filter_dir)
+    for src_name in l_dir:
+        if len(src_name) == 4:
+            #try:
+            int(src_name)
+            to_add = os.path.join(source_name)
+            # filter sources, remove first directory
+            if filter_dir:
+                to_add = to_add.replace('archive/', '').replace('alerts/', '')
+            l_sources_name.add(to_add)
+            return l_sources_name
+            #except:
+            #    pass
+        if source_name:
+            src_name = os.path.join(source_name, src_name)
+        l_sources_name = _get_dir_source_name(directory, source_name=src_name, l_sources_name=l_sources_name, filter_dir=filter_dir)
     return l_sources_name
 
 
 def get_all_items_sources(filter_dir=False, r_list=False):
-    res = _get_dir_source_name(PASTES_FOLDER, filter_dir=filter_dir)
-    if res:
+    if res := _get_dir_source_name(PASTES_FOLDER, filter_dir=filter_dir):
         if r_list:
             res = list(res)
         return res
@@ -228,16 +208,31 @@ def get_all_items_sources(filter_dir=False, r_list=False):
 
 def verify_sources_list(sources):
     all_sources = get_all_items_sources()
-    for source in sources:
-        if source not in all_sources:
-            return {'status': 'error', 'reason': 'Invalid source', 'value': source}, 400
-    return None
+    return next(
+        (
+            (
+                {
+                    'status': 'error',
+                    'reason': 'Invalid source',
+                    'value': source,
+                },
+                400,
+            )
+            for source in sources
+            if source not in all_sources
+        ),
+        None,
+    )
 
 def get_all_items_metadata_dict(list_id):
-    list_meta = []
-    for item_id in list_id:
-        list_meta.append( {'id': item_id, 'date': get_item_date(item_id), 'tags': Tag.get_obj_tag(item_id)} )
-    return list_meta
+    return [
+        {
+            'id': item_id,
+            'date': get_item_date(item_id),
+            'tags': Tag.get_obj_tag(item_id),
+        }
+        for item_id in list_id
+    ]
 
 ##--  --##
 

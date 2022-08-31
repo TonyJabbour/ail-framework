@@ -87,7 +87,7 @@ class PubSub(object): ## TODO: remove config, use ConfigLoader by default
                 p.publish(channel, ( m['message']) )
         for p, channel in self.publishers['ZMQ']:
             if channel_message is None or channel_message == channel:
-                p.send('{} {}'.format(channel, m['message']))
+                p.send(f"{channel} {m['message']}")
                 #p.send(b' '.join( [channel,  mess] ) )
 
 
@@ -157,16 +157,16 @@ class Process(object):
         if src != 'Redis' and src:
             self.pubsub.setup_subscribe(src)
             for msg in self.pubsub.subscribe():
-                in_set = self.subscriber_name + 'in'
+                in_set = f'{self.subscriber_name}in'
                 self.r_temp.sadd(in_set, msg)
                 self.r_temp.hset('queues', self.subscriber_name,
                                  int(self.r_temp.scard(in_set)))
         else:
-            print('{} has no subscriber'.format(self.subscriber_name))
+            print(f'{self.subscriber_name} has no subscriber')
 
     def get_from_set(self):
         # multiproc
-        in_set = self.subscriber_name + 'in'
+        in_set = f'{self.subscriber_name}in'
         self.r_temp.hset('queues', self.subscriber_name,
                          int(self.r_temp.scard(in_set)))
         message = self.r_temp.spop(in_set)
@@ -177,50 +177,62 @@ class Process(object):
         if message is None:
             return None
 
-        else:
-            try:
-                if '.gz' in message:
-                    path = message.split(".")[-2].split("/")[-1]
-                    #find start of path with AIL_HOME
-                    index_s = message.find(os.environ['AIL_HOME'])
-                    #Stop when .gz
-                    index_e = message.find(".gz")+3
-                    if(index_s == -1):
-                        complete_path = message[0:index_e]
-                    else:
-                        complete_path = message[index_s:index_e]
+        try:
+            if '.gz' in message:
+                path = message.split(".")[-2].split("/")[-1]
+                #find start of path with AIL_HOME
+                index_s = message.find(os.environ['AIL_HOME'])
+                #Stop when .gz
+                index_e = message.find(".gz")+3
+                complete_path = (
+                    message[:index_e]
+                    if (index_s == -1)
+                    else message[index_s:index_e]
+                )
 
-                else:
-                    path = "-"
-                    complete_path = "?"
+            else:
+                path = "-"
+                complete_path = "?"
 
-                value = str(timestamp) + ", " + path
-                self.r_temp.set("MODULE_"+self.subscriber_name + "_" + str(self.moduleNum), value)
-                self.r_temp.set("MODULE_"+self.subscriber_name + "_" + str(self.moduleNum) + "_PATH", complete_path)
-                self.r_temp.sadd("MODULE_TYPE_"+self.subscriber_name, str(self.moduleNum))
+            value = f"{timestamp}, {path}"
+            self.r_temp.set(f"MODULE_{self.subscriber_name}_{str(self.moduleNum)}", value)
+            self.r_temp.set(
+                f"MODULE_{self.subscriber_name}_{str(self.moduleNum)}_PATH",
+                complete_path,
+            )
 
-                curr_date = datetime.date.today()
-                self.serv_statistics.hincrby(curr_date.strftime("%Y%m%d"),'paste_by_modules_in:'+self.subscriber_name, 1)
-                return message
+            self.r_temp.sadd(f"MODULE_TYPE_{self.subscriber_name}", str(self.moduleNum))
 
-            except:
-                print('except')
-                path = "?"
-                value = str(timestamp) + ", " + path
-                self.r_temp.set("MODULE_"+self.subscriber_name + "_" + str(self.moduleNum), value)
-                self.r_temp.set("MODULE_"+self.subscriber_name + "_" + str(self.moduleNum) + "_PATH", "?")
-                self.r_temp.sadd("MODULE_TYPE_"+self.subscriber_name, str(self.moduleNum))
-                return message
+            curr_date = datetime.date.today()
+            self.serv_statistics.hincrby(
+                curr_date.strftime("%Y%m%d"),
+                f'paste_by_modules_in:{self.subscriber_name}',
+                1,
+            )
+
+            return message
+
+        except:
+            print('except')
+            path = "?"
+            value = f"{timestamp}, {path}"
+            self.r_temp.set(f"MODULE_{self.subscriber_name}_{str(self.moduleNum)}", value)
+            self.r_temp.set(
+                f"MODULE_{self.subscriber_name}_{str(self.moduleNum)}_PATH", "?"
+            )
+
+            self.r_temp.sadd(f"MODULE_TYPE_{self.subscriber_name}", str(self.moduleNum))
+            return message
 
     def populate_set_out(self, msg, channel=None):
         # multiproc
         msg = {'message': msg}
         if channel is not None:
-            msg.update({'channel': channel})
+            msg['channel'] = channel
 
         # bytes64 encode bytes to ascii only bytes
         j = json.dumps(msg)
-        self.r_temp.sadd(self.subscriber_name + 'out', j)
+        self.r_temp.sadd(f'{self.subscriber_name}out', j)
 
     def publish(self):
         # monoproc
@@ -231,7 +243,7 @@ class Process(object):
         for name in dest.split(','):
             self.pubsub.setup_publish(name)
         while True:
-            message = self.r_temp.spop(self.subscriber_name + 'out')
+            message = self.r_temp.spop(f'{self.subscriber_name}out')
 
             if message is None:
                 time.sleep(1)
@@ -240,4 +252,8 @@ class Process(object):
 
     def incr_module_timeout_statistic(self):
         curr_date = datetime.date.today()
-        self.serv_statistics.hincrby(curr_date.strftime("%Y%m%d"),'paste_by_modules_timeout:'+self.subscriber_name, 1)
+        self.serv_statistics.hincrby(
+            curr_date.strftime("%Y%m%d"),
+            f'paste_by_modules_timeout:{self.subscriber_name}',
+            1,
+        )

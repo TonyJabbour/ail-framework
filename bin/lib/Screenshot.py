@@ -25,9 +25,18 @@ config_loader = None
 
 # get screenshot relative path
 def get_screenshot_rel_path(sha256_string, add_extension=False):
-    screenshot_path =  os.path.join(sha256_string[0:2], sha256_string[2:4], sha256_string[4:6], sha256_string[6:8], sha256_string[8:10], sha256_string[10:12], sha256_string[12:])
+    screenshot_path = os.path.join(
+        sha256_string[:2],
+        sha256_string[2:4],
+        sha256_string[4:6],
+        sha256_string[6:8],
+        sha256_string[8:10],
+        sha256_string[10:12],
+        sha256_string[12:],
+    )
+
     if add_extension:
-        screenshot_path = screenshot_path + '.png'
+        screenshot_path = f'{screenshot_path}.png'
     return screenshot_path
 
 def get_screenshot_filepath(sha256_string):
@@ -39,8 +48,7 @@ def exist_screenshot(sha256_string):
     return os.path.isfile(screenshot_path)
 
 def get_metadata(sha256_string):
-    metadata_dict = {}
-    metadata_dict['img'] = get_screenshot_rel_path(sha256_string)
+    metadata_dict = {'img': get_screenshot_rel_path(sha256_string)}
     metadata_dict['tags'] = get_screenshot_tags(sha256_string)
     metadata_dict['is_tags_safe'] = Tag.is_tags_safe(metadata_dict['tags'])
     return metadata_dict
@@ -49,14 +57,13 @@ def get_screenshot_tags(sha256_string):
     return Tag.get_obj_tag(sha256_string)
 
 def get_screenshot_items_list(sha256_string):
-    res = r_serv_onion.smembers('screenshot:{}'.format(sha256_string))
-    if res:
+    if res := r_serv_onion.smembers(f'screenshot:{sha256_string}'):
         return list(res)
     else:
         return []
 
 def get_item_screenshot(item_id):
-    return r_serv_metadata.hget('paste_metadata:{}'.format(item_id), 'screenshot')
+    return r_serv_metadata.hget(f'paste_metadata:{item_id}', 'screenshot')
 
 def get_item_screenshot_list(item_id):
     '''
@@ -64,11 +71,7 @@ def get_item_screenshot_list(item_id):
 
     :param item_id: item id
     '''
-    screenshot = get_item_screenshot(item_id)
-    if screenshot:
-        return [screenshot]
-    else:
-        return []
+    return [screenshot] if (screenshot := get_item_screenshot(item_id)) else []
 
 def get_domain_screenshot(domain):
     '''
@@ -76,8 +79,7 @@ def get_domain_screenshot(domain):
 
     :param domain: crawled domain
     '''
-    res = r_serv_onion.smembers('domain_screenshot:{}'.format(domain))
-    if res:
+    if res := r_serv_onion.smembers(f'domain_screenshot:{domain}'):
         return list(res)
     else:
         return []
@@ -88,10 +90,8 @@ def get_randon_domain_screenshot(domain, r_path=True):
 
     :param domain: crawled domain
     '''
-    res = r_serv_onion.srandmember('domain_screenshot:{}'.format(domain))
-    if res and r_path:
-        return get_screenshot_rel_path(res)
-    return res
+    res = r_serv_onion.srandmember(f'domain_screenshot:{domain}')
+    return get_screenshot_rel_path(res) if res and r_path else res
 
 def get_screenshot_domain(sha256_string):
     '''
@@ -99,8 +99,7 @@ def get_screenshot_domain(sha256_string):
 
     :param sha256_string: sha256_string
     '''
-    res = r_serv_onion.smembers('screenshot_domain:{}'.format(sha256_string))
-    if res:
+    if res := r_serv_onion.smembers(f'screenshot_domain:{sha256_string}'):
         return list(res)
     else:
         return []
@@ -130,23 +129,23 @@ def get_screenshot_correlated_object(sha256_string, correlation_objects=[]):
     return decoded_correlation
 
 def save_item_relationship(obj_id, item_id):
-    r_serv_metadata.hset('paste_metadata:{}'.format(item_id), 'screenshot', obj_id)
-    r_serv_onion.sadd('screenshot:{}'.format(obj_id), item_id)
+    r_serv_metadata.hset(f'paste_metadata:{item_id}', 'screenshot', obj_id)
+    r_serv_onion.sadd(f'screenshot:{obj_id}', item_id)
     if Item.is_crawled(item_id):
         domain = Item.get_item_domain(item_id)
         save_domain_relationship(obj_id, domain)
 
 def delete_item_relationship(obj_id, item_id):
-    r_serv_metadata.hdel('paste_metadata:{}'.format(item_id), 'screenshot', obj_id)
-    r_serv_onion.srem('screenshot:{}'.format(obj_id), item_id)
+    r_serv_metadata.hdel(f'paste_metadata:{item_id}', 'screenshot', obj_id)
+    r_serv_onion.srem(f'screenshot:{obj_id}', item_id)
 
 def save_domain_relationship(obj_id, domain):
-    r_serv_onion.sadd('domain_screenshot:{}'.format(domain), obj_id)
-    r_serv_onion.sadd('screenshot_domain:{}'.format(obj_id), domain)
+    r_serv_onion.sadd(f'domain_screenshot:{domain}', obj_id)
+    r_serv_onion.sadd(f'screenshot_domain:{obj_id}', domain)
 
 def delete_domain_relationship(obj_id, domain):
-    r_serv_onion.srem('domain_screenshot:{}'.format(domain), obj_id)
-    r_serv_onion.sadd('screenshot_domain:{}'.format(obj_id), domain)
+    r_serv_onion.srem(f'domain_screenshot:{domain}', obj_id)
+    r_serv_onion.sadd(f'screenshot_domain:{obj_id}', domain)
 
 def save_obj_relationship(obj_id, obj2_type, obj2_id):
     if obj2_type == 'domain':
@@ -208,9 +207,7 @@ def delete_screenshot_file(obj_id):
     return True
 
 def create_screenshot(obj_id, obj_meta, io_content):
-    # # TODO: check if sha256
-    res = save_screenshot_file(obj_id, io_content)
-    if res:
+    if res := save_screenshot_file(obj_id, io_content):
         # creata tags
         if 'tags' in obj_meta:
             # # TODO: handle mixed tags: taxonomies and Galaxies
@@ -230,12 +227,12 @@ def delete_screenshot(obj_id):
     obj_correlations = get_screenshot_correlated_object(obj_id)
     if 'domain' in obj_correlations:
         for domain in obj_correlations['domain']:
-            r_serv_onion.srem('domain_screenshot:{}'.format(domain), obj_id)
-        r_serv_onion.delete('screenshot_domain:{}'.format(obj_id))
+            r_serv_onion.srem(f'domain_screenshot:{domain}', obj_id)
+        r_serv_onion.delete(f'screenshot_domain:{obj_id}')
 
     if 'paste' in obj_correlations: # TODO: handle item
         for item_id in obj_correlations['paste']:
-            r_serv_metadata.hdel('paste_metadata:{}'.format(item_id), 'screenshot')
-        r_serv_onion.delete('screenshot:{}'.format(obj_id), item_id)
+            r_serv_metadata.hdel(f'paste_metadata:{item_id}', 'screenshot')
+        r_serv_onion.delete(f'screenshot:{obj_id}', item_id)
 
     return True

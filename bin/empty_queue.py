@@ -12,6 +12,7 @@ Requirements:
 
 
 """
+
 import redis
 import os
 import time
@@ -27,7 +28,7 @@ if __name__ == "__main__":
     config_section = ['Curve']
 
     for queue in config_section:
-        print('dropping: ' + queue)
+        print(f'dropping: {queue}')
         p = Process(queue)
         while True:
             message = p.get_from_set()

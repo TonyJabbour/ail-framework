@@ -32,8 +32,7 @@ def launch_background_upgrade(version, l_script_name):
             #    if int(update_progress) != 100:
             #        r_serv.set('ail:update_error', 'Update {} Failed'.format(version))
 
-        update_progress = r_serv.get('ail:current_background_script_stat')
-        if update_progress:
+        if update_progress := r_serv.get('ail:current_background_script_stat'):
             if int(update_progress) == 100:
                 r_serv.delete('ail:update_in_progress')
                 r_serv.delete('ail:current_background_script')

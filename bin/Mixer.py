@@ -29,6 +29,7 @@ Every data coming from a named feed can be sent to a pre-processing module befor
 The mapping can be done via the variable FEED_QUEUE_MAPPING
 
 """
+
 import os
 import sys
 
@@ -79,7 +80,7 @@ if __name__ == '__main__':
     duplicated_paste_per_feeder = {}
     time_1 = time.time()
 
-    print('Operation mode ' + str(operation_mode))
+    print(f'Operation mode {str(operation_mode)}')
 
     while True:
 
@@ -123,29 +124,25 @@ if __name__ == '__main__':
                     if server.exists(digest): # Content already exists
                         #STATS
                         duplicated_paste_per_feeder[feeder_name] += 1
-                    else: # New content
-
-                        # populate Global OR populate another set based on the feeder_name
-                        if feeder_name in FEED_QUEUE_MAPPING:
-                            p.populate_set_out(relay_message, FEED_QUEUE_MAPPING[feeder_name])
-                        else:
-                            p.populate_set_out(relay_message, 'Mixer')
+                    elif feeder_name in FEED_QUEUE_MAPPING:
+                        p.populate_set_out(relay_message, FEED_QUEUE_MAPPING[feeder_name])
+                    else:
+                        p.populate_set_out(relay_message, 'Mixer')
 
                     server.sadd(digest, feeder_name)
                     server.expire(digest, ttl_key)
 
 
-                # Keep duplicate coming from different sources
                 elif operation_mode == 2:
                     # Filter to avoid duplicate
-                    content = server.get('HASH_'+paste_name)
+                    content = server.get(f'HASH_{paste_name}')
                     if content is None:
                         # New content
                         # Store in redis for filtering
-                        server.set('HASH_'+paste_name, digest)
+                        server.set(f'HASH_{paste_name}', digest)
                         server.sadd(paste_name, feeder_name)
                         server.expire(paste_name, ttl_key)
-                        server.expire('HASH_'+paste_name, ttl_key)
+                        server.expire(f'HASH_{paste_name}', ttl_key)
 
                         # populate Global OR populate another set based on the feeder_name
                         if feeder_name in FEED_QUEUE_MAPPING:
@@ -154,10 +151,10 @@ if __name__ == '__main__':
                             p.populate_set_out(relay_message, 'Mixer')
 
                     else:
+                        # Same paste name but different content
+                        #STATS
+                        duplicated_paste_per_feeder[feeder_name] += 1
                         if digest != content:
-                            # Same paste name but different content
-                            #STATS
-                            duplicated_paste_per_feeder[feeder_name] += 1
                             server.sadd(paste_name, feeder_name)
                             server.expire(paste_name, ttl_key)
 
@@ -167,18 +164,10 @@ if __name__ == '__main__':
                             else:
                                 p.populate_set_out(relay_message, 'Mixer')
 
-                        else:
-                            # Already processed
-                            # Keep track of processed pastes
-                            #STATS
-                            duplicated_paste_per_feeder[feeder_name] += 1
-                            continue
+                elif feeder_name in FEED_QUEUE_MAPPING:
+                    p.populate_set_out(relay_message, FEED_QUEUE_MAPPING[feeder_name])
                 else:
-                    # populate Global OR populate another set based on the feeder_name
-                    if feeder_name in FEED_QUEUE_MAPPING:
-                        p.populate_set_out(relay_message, FEED_QUEUE_MAPPING[feeder_name])
-                    else:
-                        p.populate_set_out(relay_message, 'Mixer')
+                    p.populate_set_out(relay_message, 'Mixer')
 
 
             else:
@@ -188,9 +177,9 @@ if __name__ == '__main__':
         else:
 
             if int(time.time() - time_1) > refresh_time:
-                # update internal feeder
-                list_feeder = server_cache.hkeys("mixer_cache:list_feeder")
-                if list_feeder:
+                if list_feeder := server_cache.hkeys(
+                    "mixer_cache:list_feeder"
+                ):
                     for feeder in list_feeder:
                         count = int(server_cache.hget("mixer_cache:list_feeder", feeder))
                         if count is None:

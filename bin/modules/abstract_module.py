@@ -30,10 +30,10 @@ class AbstractModule(ABC):
         logger_channel: str; set the logger channel name, 'Script' by default
         """
         # Module name if provided else instance className
-        self.module_name = module_name if module_name else self._module_name()
+        self.module_name = module_name or self._module_name()
 
         # Module name if provided else instance className
-        self.queue_name = queue_name if queue_name else self._module_name()
+        self.queue_name = queue_name or self._module_name()
 
         # Init Redis Logger
         self.redis_logger = publisher
@@ -96,10 +96,7 @@ class AbstractModule(ABC):
 
         # Endless loop processing messages from the input queue
         while self.proceed:
-            # Get one message (ex:item id) from the Redis Queue (QueueIn)
-            message = self.get_message()
-
-            if message:
+            if message := self.get_message():
                 try:
                     # Module processing with the message from the queue
                     self.compute(message)
@@ -114,9 +111,6 @@ class AbstractModule(ABC):
                     print(f'MESSAGE: {message}')
                     print('TRACEBACK:')
                     print(trace)
-                # remove from set_module
-                ## check if item process == completed
-
             else:
                 self.computeNone()
                 # Wait before next process

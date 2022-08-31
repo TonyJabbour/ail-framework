@@ -39,21 +39,18 @@ def save_in_file(message, pgp_content):
     file_name = os.path.join(pgp_dump_dir_to_process, UUID)
     with open(file_name, 'w') as f:
         f.write(pgp_content)
-    r_serv_db.sadd('pgpdumb:uuid', '{};{}'.format(UUID, message))
+    r_serv_db.sadd('pgpdumb:uuid', f'{UUID};{message}')
 
 def remove_html(item_content):
     try:
-        if bool(BeautifulSoup(item_content, "html.parser").find()):
-            soup = BeautifulSoup(item_content, 'html.parser')
-            # kill all script and style elements
-            for script in soup(["script", "style"]):
-                script.extract()    # remove
-
-            # get text
-            text = soup.get_text()
-            return text
-        else:
+        if not bool(BeautifulSoup(item_content, "html.parser").find()):
             return item_content
+        soup = BeautifulSoup(item_content, 'html.parser')
+        # kill all script and style elements
+        for script in soup(["script", "style"]):
+            script.extract()    # remove
+
+        return soup.get_text()
     except TypeError:
         return item_content
 
@@ -81,7 +78,7 @@ def extract_all_id(message, item_content, regex=None, is_file=False):
             extract_id_from_output(pgp_packet)
 
 def get_pgp_packet(message, save_path):
-    save_path = '{}'.format(save_path)
+    save_path = f'{save_path}'
     # remove Version
     all_version = re.findall(regex_tool_version, save_path)
     for version in all_version:
@@ -109,14 +106,13 @@ def get_pgp_packet(message, save_path):
         try:
             output = output.decode()
         except UnicodeDecodeError:
-            publisher.error('Error PgpDump UnicodeDecodeError: {}'.format(message))
+            publisher.error(f'Error PgpDump UnicodeDecodeError: {message}')
             output = ''
         return output
 
 def get_pgp_packet_file(file):
     process1 = subprocess.Popen([ 'pgpdump', file], stdout=subprocess.PIPE)
-    output = process1.communicate()[0].decode()
-    return output
+    return process1.communicate()[0].decode()
 
 def extract_id_from_output(pgp_dump_outpout):
     all_user_id = set(re.findall(regex_user_id, pgp_dump_outpout))
@@ -176,10 +172,10 @@ if __name__ == '__main__':
         os.makedirs(pgp_dump_dir_to_process)
 
     user_id_str = 'User ID - '
-    regex_user_id= '{}.+'.format(user_id_str)
+    regex_user_id = f'{user_id_str}.+'
 
     key_id_str = 'Key ID - '
-    regex_key_id = '{}.+'.format(key_id_str)
+    regex_key_id = f'{key_id_str}.+'
     regex_pgp_public_blocs = '-----BEGIN PGP PUBLIC KEY BLOCK-----[\s\S]+?-----END PGP PUBLIC KEY BLOCK-----'
     regex_pgp_signature = '-----BEGIN PGP SIGNATURE-----[\s\S]+?-----END PGP SIGNATURE-----'
     regex_pgp_message = '-----BEGIN PGP MESSAGE-----[\s\S]+?-----END PGP MESSAGE-----'
@@ -196,14 +192,14 @@ if __name__ == '__main__':
 
     max_execution_time = p.config.getint("PgpDump", "max_execution_time")
 
+    is_file = False
+    set_mail = set()
+
     # Endless loop getting messages from the input queue
     while True:
 
-        is_file = False
         set_key = set()
         set_name = set()
-        set_mail = set()
-
         if r_serv_db.scard('pgpdumb:uuid') > 0:
             res = r_serv_db.spop('pgpdumb:uuid')
             file_to_process, message = res.split(';', 1)
@@ -220,7 +216,7 @@ if __name__ == '__main__':
             message = p.get_from_set()
 
             if message is None:
-                publisher.debug("{} queue is empty, waiting".format(config_section))
+                publisher.debug(f"{config_section} queue is empty, waiting")
                 time.sleep(1)
                 continue
 

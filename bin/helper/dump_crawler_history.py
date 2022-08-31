@@ -17,8 +17,11 @@ from HiddenServices import HiddenServices
 from Helper import Process
 
 def substract_date(date_from, date_to):
-    date_from = datetime.date(int(date_from[0:4]), int(date_from[4:6]), int(date_from[6:8]))
-    date_to = datetime.date(int(date_to[0:4]), int(date_to[4:6]), int(date_to[6:8]))
+    date_from = datetime.date(
+        int(date_from[:4]), int(date_from[4:6]), int(date_from[6:8])
+    )
+
+    date_to = datetime.date(int(date_to[:4]), int(date_to[4:6]), int(date_to[6:8]))
     delta = date_to - date_from # timedelta
     l_date = []
     for i in range(delta.days + 1):
@@ -45,9 +48,9 @@ dir_path = os.path.join(os.environ['AIL_HOME'], 'temp')
 domain_skipped = []
 
 for date in date_range:
-    domains_up = list(r_serv_onion.smembers('{}_up:{}'.format(service_type, date)))
+    domains_up = list(r_serv_onion.smembers(f'{service_type}_up:{date}'))
     if domains_up:
-        save_path = os.path.join(dir_path, date[0:4], date[4:6], date[6:8])
+        save_path = os.path.join(dir_path, date[:4], date[4:6], date[6:8])
         try:
             os.makedirs(save_path)
         except FileExistsError:
@@ -60,15 +63,13 @@ for date in date_range:
             l_pastes = h.get_last_crawled_pastes(item_root=item_core['root_item'])
             try:
                 res = h.create_domain_basic_archive(l_pastes)
-                filename = os.path.join(save_path, '{}'.format(domain))
+                filename = os.path.join(save_path, f'{domain}')
                 with open(filename, 'wb') as f:
                     shutil.copyfileobj(res, f)
                     print('done')
             except Exception as e:
                 print('skipped')
                 domain_skipped.append(domain)
-                pass
-
 print()
 print()
 print('DOMAINS SKIPPED: ')

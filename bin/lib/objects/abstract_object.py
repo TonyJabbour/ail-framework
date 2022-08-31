@@ -49,10 +49,7 @@ class AbstractObject(ABC):
         return self.type
 
     def get_subtype(self, r_str=False):
-        if not self.subtype:
-            if r_str:
-                return ''
-        return self.subtype
+        return '' if not self.subtype and r_str else self.subtype
 
     def get_default_meta(self, tags=False):
         dict_meta = {'id': self.get_id(),
@@ -78,18 +75,18 @@ class AbstractObject(ABC):
     # # TODO: unregister =====
 
     def is_investigated(self):
-        if not self.subtype:
-            is_investigated = is_object_investigated(self.id, self.type)
-        else:
-            is_investigated = is_object_investigated(self.id, self.type, self.subtype)
-        return is_investigated
+        return (
+            is_object_investigated(self.id, self.type, self.subtype)
+            if self.subtype
+            else is_object_investigated(self.id, self.type)
+        )
 
     def get_investigations(self):
-        if not self.subtype:
-            investigations = get_obj_investigations(self.id, self.type)
-        else:
-            investigations = get_obj_investigations(self.id, self.type, self.subtype)
-        return investigations
+        return (
+            get_obj_investigations(self.id, self.type, self.subtype)
+            if self.subtype
+            else get_obj_investigations(self.id, self.type)
+        )
     #- Investigations -#
 
     ## Trackers ##

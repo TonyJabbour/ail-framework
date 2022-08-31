@@ -119,14 +119,10 @@ def extract_favicon_from_html(html, url):
 
     # # TODO: handle base64 favicon
     for tag in set_icons:
-        icon_url = tag.get('href')
-        if icon_url:
+        if icon_url := tag.get('href'):
             if icon_url.startswith('//'):
                 icon_url = icon_url.replace('//', '/')
-            if icon_url.startswith('data:'):
-                # # TODO: handle base64 favicon
-                pass
-            else:
+            if not icon_url.startswith('data:'):
                 icon_url = urljoin(url, icon_url)
                 icon_url = urlparse(icon_url, scheme=urlparse(url).scheme).geturl()
                 favicon_urls.add(icon_url)
@@ -142,8 +138,8 @@ def extract_favicon_from_html(html, url):
 # # TODO: fill empty fields
 def create_cookie_crawler(cookie_dict, domain, crawler_type='regular'):
     # check cookie domain filed
-    if not 'domain' in cookie_dict:
-        cookie_dict['domain'] = '.{}'.format(domain)
+    if 'domain' not in cookie_dict:
+        cookie_dict['domain'] = f'.{domain}'
 
     # tor browser: disable secure cookie
     if crawler_type=='onion':
@@ -160,10 +156,10 @@ def create_cookie_crawler(cookie_dict, domain, crawler_type='regular'):
 
 def load_crawler_cookies(cookiejar_uuid, domain, crawler_type='regular'):
     cookies = get_cookiejar_cookies_list(cookiejar_uuid)
-    all_cookies = []
-    for cookie_dict in cookies:
-        all_cookies.append(create_cookie_crawler(cookie_dict, domain, crawler_type=crawler_type))
-    return all_cookies
+    return [
+        create_cookie_crawler(cookie_dict, domain, crawler_type=crawler_type)
+        for cookie_dict in cookies
+    ]
 
 ################################################################################
 
@@ -171,33 +167,35 @@ def get_all_cookiejar():
     r_serv_onion.smembers('cookiejar:all')
 
 def get_global_cookiejar():
-    res = r_serv_onion.smembers('cookiejar:global')
-    if not res:
-        res = []
-    return res
+    return r_serv_onion.smembers('cookiejar:global') or []
 
 def get_user_cookiejar(user_id):
-    res = r_serv_onion.smembers('cookiejar:user:{}'.format(user_id))
-    if not res:
-        res = []
-    return res
+    return r_serv_onion.smembers(f'cookiejar:user:{user_id}') or []
 
 def exist_cookiejar(cookiejar_uuid):
-    return r_serv_onion.exists('cookiejar_metadata:{}'.format(cookiejar_uuid))
+    return r_serv_onion.exists(f'cookiejar_metadata:{cookiejar_uuid}')
 
 def create_cookiejar(user_id, level=1, description=None):
     cookiejar_uuid = str(uuid.uuid4())
 
     r_serv_onion.sadd('cookiejar:all', cookiejar_uuid)
     if level==0:
-        r_serv_onion.sadd('cookiejar:user:{}'.format(user_id), cookiejar_uuid)
+        r_serv_onion.sadd(f'cookiejar:user:{user_id}', cookiejar_uuid)
     else:
         r_serv_onion.sadd('cookiejar:global', cookiejar_uuid)
     # metadata
-    r_serv_onion.hset('cookiejar_metadata:{}'.format(cookiejar_uuid), 'user_id', user_id)
-    r_serv_onion.hset('cookiejar_metadata:{}'.format(cookiejar_uuid), 'level', level)
-    r_serv_onion.hset('cookiejar_metadata:{}'.format(cookiejar_uuid), 'description', description)
-    r_serv_onion.hset('cookiejar_metadata:{}'.format(cookiejar_uuid), 'date', datetime.now().strftime("%Y%m%d"))
+    r_serv_onion.hset(f'cookiejar_metadata:{cookiejar_uuid}', 'user_id', user_id)
+    r_serv_onion.hset(f'cookiejar_metadata:{cookiejar_uuid}', 'level', level)
+    r_serv_onion.hset(
+        f'cookiejar_metadata:{cookiejar_uuid}', 'description', description
+    )
+
+    r_serv_onion.hset(
+        f'cookiejar_metadata:{cookiejar_uuid}',
+        'date',
+        datetime.now().strftime("%Y%m%d"),
+    )
+
 
     # if json_cookies:
     #     json_cookies = json.loads(json_cookies) # # TODO: catch Exception
@@ -211,17 +209,14 @@ def delete_cookie_jar(cookiejar_uuid):
     level = get_cookiejar_level(cookiejar_uuid)
     if level == 0:
         user_id = get_cookiejar_owner(cookiejar_uuid)
-        r_serv_onion.srem('cookiejar:user:{}'.format(user_id), cookiejar_uuid)
+        r_serv_onion.srem(f'cookiejar:user:{user_id}', cookiejar_uuid)
     else:
         r_serv_onion.srem('cookiejar:global', cookiejar_uuid)
 
-    r_serv_onion.delete('cookiejar_metadata:{}'.format(cookiejar_uuid))
+    r_serv_onion.delete(f'cookiejar_metadata:{cookiejar_uuid}')
 
 def get_cookiejar_cookies_uuid(cookiejar_uuid):
-    res = r_serv_onion.smembers('cookiejar:{}:cookies:uuid'.format(cookiejar_uuid))
-    if not res:
-        res = []
-    return res
+    return r_serv_onion.smembers(f'cookiejar:{cookiejar_uuid}:cookies:uuid') or []
 
 def get_cookiejar_cookies_list(cookiejar_uuid, add_cookie_uuid=False):
     l_cookiejar = []
@@ -234,19 +229,19 @@ def get_cookiejar_cookies_list(cookiejar_uuid, add_cookie_uuid=False):
 
 ## Cookiejar metadata ##
 def get_cookiejar_description(cookiejar_uuid):
-    return r_serv_onion.hget('cookiejar_metadata:{}'.format(cookiejar_uuid), 'description')
+    return r_serv_onion.hget(f'cookiejar_metadata:{cookiejar_uuid}', 'description')
 
 def get_cookiejar_date(cookiejar_uuid):
-    return r_serv_onion.hget('cookiejar_metadata:{}'.format(cookiejar_uuid), 'date')
+    return r_serv_onion.hget(f'cookiejar_metadata:{cookiejar_uuid}', 'date')
 
 def get_cookiejar_owner(cookiejar_uuid):
-    return r_serv_onion.hget('cookiejar_metadata:{}'.format(cookiejar_uuid), 'user_id')
+    return r_serv_onion.hget(f'cookiejar_metadata:{cookiejar_uuid}', 'user_id')
 
 def get_cookiejar_date(cookiejar_uuid):
-    return r_serv_onion.hget('cookiejar_metadata:{}'.format(cookiejar_uuid), 'date')
+    return r_serv_onion.hget(f'cookiejar_metadata:{cookiejar_uuid}', 'date')
 
 def get_cookiejar_level(cookiejar_uuid):
-    res = r_serv_onion.hget('cookiejar_metadata:{}'.format(cookiejar_uuid), 'level')
+    res = r_serv_onion.hget(f'cookiejar_metadata:{cookiejar_uuid}', 'level')
     if not res:
         res = 1
     return int(res)
@@ -263,13 +258,15 @@ def get_cookiejar_metadata(cookiejar_uuid, level=False):
     return dict_cookiejar
 
 def get_cookiejar_metadata_by_iterator(iter_cookiejar_uuid):
-    l_cookiejar_metadata = []
-    for cookiejar_uuid in iter_cookiejar_uuid:
-        l_cookiejar_metadata.append(get_cookiejar_metadata(cookiejar_uuid))
-    return l_cookiejar_metadata
+    return [
+        get_cookiejar_metadata(cookiejar_uuid)
+        for cookiejar_uuid in iter_cookiejar_uuid
+    ]
 
 def edit_cookiejar_description(cookiejar_uuid, description):
-    r_serv_onion.hset('cookiejar_metadata:{}'.format(cookiejar_uuid), 'description', description)
+    r_serv_onion.hset(
+        f'cookiejar_metadata:{cookiejar_uuid}', 'description', description
+    )
 
 # # # # # # # #
 #             #
@@ -291,30 +288,28 @@ def get_cookie_all_keys_name():
     return ['name', 'value', 'domain', 'path', 'httpOnly', 'secure']
 
 def exists_cookie(cookie_uuid):
-    if int(r_serv_onion.scard('cookies:map:cookiejar:{}'.format(cookie_uuid))) > 0:
-        return True
-    return False
+    return int(r_serv_onion.scard(f'cookies:map:cookiejar:{cookie_uuid}')) > 0
 
 def get_cookie_value(cookie_uuid, name):
-    return r_serv_onion.hget('cookiejar:cookie:{}'.format(cookie_uuid), name)
+    return r_serv_onion.hget(f'cookiejar:cookie:{cookie_uuid}', name)
 
 def set_cookie_value(cookie_uuid, name, value):
-    r_serv_onion.hset('cookiejar:cookie:{}'.format(cookie_uuid), name, value)
+    r_serv_onion.hset(f'cookiejar:cookie:{cookie_uuid}', name, value)
 
 def delete_cookie_value(cookie_uuid, name):
-    r_serv_onion.hdel('cookiejar:cookie:{}'.format(cookie_uuid), name)
+    r_serv_onion.hdel(f'cookiejar:cookie:{cookie_uuid}', name)
 
 def get_cookie_dict(cookie_uuid):
-    cookie_dict = {}
-    for key_name in r_serv_onion.hkeys('cookiejar:cookie:{}'.format(cookie_uuid)):
-        cookie_dict[key_name] = get_cookie_value(cookie_uuid, key_name)
-    return cookie_dict
+    return {
+        key_name: get_cookie_value(cookie_uuid, key_name)
+        for key_name in r_serv_onion.hkeys(f'cookiejar:cookie:{cookie_uuid}')
+    }
 
 # name, value, path=None, httpOnly=None, secure=None, domain=None, text=None
 def add_cookie_to_cookiejar(cookiejar_uuid, cookie_dict):
     cookie_uuid = generate_uuid()
-    r_serv_onion.sadd('cookiejar:{}:cookies:uuid'.format(cookiejar_uuid), cookie_uuid)
-    r_serv_onion.sadd('cookies:map:cookiejar:{}'.format(cookie_uuid), cookiejar_uuid)
+    r_serv_onion.sadd(f'cookiejar:{cookiejar_uuid}:cookies:uuid', cookie_uuid)
+    r_serv_onion.sadd(f'cookies:map:cookiejar:{cookie_uuid}', cookiejar_uuid)
 
     set_cookie_value(cookie_uuid, 'name', cookie_dict['name'])
     set_cookie_value(cookie_uuid, 'value', cookie_dict['value'])
@@ -339,14 +334,14 @@ def delete_all_cookies_from_cookiejar(cookiejar_uuid):
         delete_cookie_from_cookiejar(cookiejar_uuid, cookie_uuid)
 
 def delete_cookie_from_cookiejar(cookiejar_uuid, cookie_uuid):
-    r_serv_onion.srem('cookiejar:{}:cookies:uuid'.format(cookiejar_uuid), cookie_uuid)
-    r_serv_onion.srem('cookies:map:cookiejar:{}'.format(cookie_uuid), cookiejar_uuid)
+    r_serv_onion.srem(f'cookiejar:{cookiejar_uuid}:cookies:uuid', cookie_uuid)
+    r_serv_onion.srem(f'cookies:map:cookiejar:{cookie_uuid}', cookiejar_uuid)
     if not exists_cookie(cookie_uuid):
-        r_serv_onion.delete('cookiejar:cookie:{}'.format(cookie_uuid))
+        r_serv_onion.delete(f'cookiejar:cookie:{cookie_uuid}')
 
 def edit_cookie(cookiejar_uuid, cookie_uuid, cookie_dict):
     # delete old keys
-    for key_name in r_serv_onion.hkeys('cookiejar:cookie:{}'.format(cookie_uuid)):
+    for key_name in r_serv_onion.hkeys(f'cookiejar:cookie:{cookie_uuid}'):
         if key_name not in cookie_dict:
             delete_cookie_value(cookie_uuid, key_name)
     # add new keys
@@ -385,8 +380,7 @@ def misp_cookie_import(misp_object, cookiejar_uuid):
 #### COOKIEJAR API ####
 def api_import_cookies_from_json(json_cookies_str, cookiejar_uuid): # # TODO: add catch
     json_cookies = json.loads(json_cookies_str)
-    res = import_cookies_from_json(json_cookies, cookiejar_uuid)
-    if res:
+    if res := import_cookies_from_json(json_cookies, cookiejar_uuid):
         return (res, 400)
 #### ####
 
@@ -409,8 +403,7 @@ def api_get_cookiejar_cookies(cookiejar_uuid, user_id):
     return (res, 200)
 
 def api_edit_cookiejar_description(user_id, cookiejar_uuid, description):
-    res = api_verify_basic_cookiejar(cookiejar_uuid, user_id)
-    if res:
+    if res := api_verify_basic_cookiejar(cookiejar_uuid, user_id):
         return res
     edit_cookiejar_description(cookiejar_uuid, description)
     return ({'cookiejar_uuid': cookiejar_uuid}, 200)
@@ -423,30 +416,32 @@ def api_get_cookiejar_cookies_with_uuid(cookiejar_uuid, user_id):
     return (res, 200)
 
 def api_get_cookies_list_select(user_id):
-    l_cookiejar = []
-    for cookies_uuid in get_global_cookiejar():
-        l_cookiejar.append('{} : {}'.format(get_cookiejar_description(cookies_uuid), cookies_uuid))
-    for cookies_uuid in get_user_cookiejar(user_id):
-        l_cookiejar.append('{} : {}'.format(get_cookiejar_description(cookies_uuid), cookies_uuid))
+    l_cookiejar = [
+        f'{get_cookiejar_description(cookies_uuid)} : {cookies_uuid}'
+        for cookies_uuid in get_global_cookiejar()
+    ]
+
+    l_cookiejar.extend(
+        f'{get_cookiejar_description(cookies_uuid)} : {cookies_uuid}'
+        for cookies_uuid in get_user_cookiejar(user_id)
+    )
+
     return sorted(l_cookiejar)
 
 def api_delete_cookie_from_cookiejar(user_id, cookiejar_uuid, cookie_uuid):
-    res = api_verify_basic_cookiejar(cookiejar_uuid, user_id)
-    if res:
+    if res := api_verify_basic_cookiejar(cookiejar_uuid, user_id):
         return res
     delete_cookie_from_cookiejar(cookiejar_uuid, cookie_uuid)
     return ({'cookiejar_uuid': cookiejar_uuid, 'cookie_uuid': cookie_uuid}, 200)
 
 def api_delete_cookie_jar(user_id, cookiejar_uuid):
-    res = api_verify_basic_cookiejar(cookiejar_uuid, user_id)
-    if res:
+    if res := api_verify_basic_cookiejar(cookiejar_uuid, user_id):
         return res
     delete_cookie_jar(cookiejar_uuid)
     return ({'cookiejar_uuid': cookiejar_uuid}, 200)
 
 def api_edit_cookie(user_id, cookiejar_uuid, cookie_uuid, cookie_dict):
-    res = api_verify_basic_cookiejar(cookiejar_uuid, user_id)
-    if res:
+    if res := api_verify_basic_cookiejar(cookiejar_uuid, user_id):
         return res
     if 'name' not in cookie_dict or 'value' not in cookie_dict or cookie_dict['name'] == '':
         ({'error': 'cookie name or value not provided'}, 400)
@@ -489,46 +484,49 @@ def sanitize_crawler_types(l_crawler_types):
     return l_crawler_types
 
 def get_all_spash_crawler_status():
-    crawler_metadata = []
     all_crawlers = r_cache.smembers('all_splash_crawlers')
-    for crawler in all_crawlers:
-        crawler_metadata.append(get_splash_crawler_status(crawler))
-    return crawler_metadata
+    return [get_splash_crawler_status(crawler) for crawler in all_crawlers]
 
 def reset_all_spash_crawler_status():
     r_cache.delete('all_splash_crawlers')
 
 def get_splash_crawler_status(spash_url):
-    crawler_type = r_cache.hget('metadata_crawler:{}'.format(spash_url), 'type')
-    crawling_domain = r_cache.hget('metadata_crawler:{}'.format(spash_url), 'crawling_domain')
-    started_time = r_cache.hget('metadata_crawler:{}'.format(spash_url), 'started_time')
-    status_info = r_cache.hget('metadata_crawler:{}'.format(spash_url), 'status')
-    crawler_info = '{}  - {}'.format(spash_url, started_time)
-    if status_info=='Waiting' or status_info=='Crawling':
-        status=True
-    else:
-        status=False
+    crawler_type = r_cache.hget(f'metadata_crawler:{spash_url}', 'type')
+    crawling_domain = r_cache.hget(
+        f'metadata_crawler:{spash_url}', 'crawling_domain'
+    )
+
+    started_time = r_cache.hget(f'metadata_crawler:{spash_url}', 'started_time')
+    status_info = r_cache.hget(f'metadata_crawler:{spash_url}', 'status')
+    crawler_info = f'{spash_url}  - {started_time}'
+    status = status_info in ['Waiting', 'Crawling']
     return {'crawler_info': crawler_info, 'crawling_domain': crawling_domain, 'status_info': status_info, 'status': status, 'type': crawler_type}
 
 def set_current_crawler_status(splash_url, status, started_time=False, crawled_domain=None, crawler_type=None):
     # TODO: get crawler type if None
     # Status: ['Waiting', 'Error', ...]
-    r_cache.hset('metadata_crawler:{}'.format(splash_url), 'status', status)
+    r_cache.hset(f'metadata_crawler:{splash_url}', 'status', status)
     if started_time:
-        r_cache.hset('metadata_crawler:{}'.format(splash_url), 'started_time', datetime.now().strftime("%Y/%m/%d  -  %H:%M.%S"))
+        r_cache.hset(
+            f'metadata_crawler:{splash_url}',
+            'started_time',
+            datetime.now().strftime("%Y/%m/%d  -  %H:%M.%S"),
+        )
+
     if crawler_type:
-        r_cache.hset('metadata_crawler:{}'.format(splash_url), 'type', crawler_type)
+        r_cache.hset(f'metadata_crawler:{splash_url}', 'type', crawler_type)
     if crawled_domain:
-        r_cache.hset('metadata_crawler:{}'.format(splash_url), 'crawling_domain', crawled_domain)
+        r_cache.hset(
+            f'metadata_crawler:{splash_url}', 'crawling_domain', crawled_domain
+        )
 
     #r_cache.sadd('all_splash_crawlers', splash_url) # # TODO: add me in fct: create_ail_crawler
 
 def get_stats_last_crawled_domains(crawler_types, date):
     statDomains = {}
     for crawler_type in crawler_types:
-        stat_type = {}
-        stat_type['domains_up'] = r_serv_onion.scard('{}_up:{}'.format(crawler_type, date))
-        stat_type['domains_down'] = r_serv_onion.scard('{}_down:{}'.format(crawler_type, date))
+        stat_type = {'domains_up': r_serv_onion.scard(f'{crawler_type}_up:{date}')}
+        stat_type['domains_down'] = r_serv_onion.scard(f'{crawler_type}_down:{date}')
         stat_type['total'] = stat_type['domains_up'] + stat_type['domains_down']
         stat_type['domains_queue'] = get_nb_elem_to_crawl_by_type(crawler_type)
         statDomains[crawler_type] = stat_type
@@ -541,8 +539,7 @@ def get_splash_crawler_latest_stats():
     return get_stats_last_crawled_domains(['onion', 'regular'], date)
 
 def get_nb_crawlers_to_launch_by_splash_name(splash_name):
-    res = r_serv_onion.hget('all_crawlers_to_launch', splash_name)
-    if res:
+    if res := r_serv_onion.hget('all_crawlers_to_launch', splash_name):
         return int(res)
     else:
         return 0
@@ -577,16 +574,18 @@ def relaunch_crawlers():
         all_crawler_urls = get_splash_all_url(splash_name, r_list=True)
         if nb_crawlers > len(all_crawler_urls):
             print('Error, can\'t launch all Splash Dockers')
-            print('Please launch {} additional {} Dockers'.format( nb_crawlers - len(all_crawler_urls), splash_name))
+            print(
+                f'Please launch {nb_crawlers - len(all_crawler_urls)} additional {splash_name} Dockers'
+            )
+
             nb_crawlers = len(all_crawler_urls)
 
         reset_all_spash_crawler_status()
 
-        for i in range(0, int(nb_crawlers)):
+        for i in range(nb_crawlers):
             splash_url = all_crawler_urls[i]
-            print(all_crawler_urls[i])
-
-            launch_ail_splash_crawler(splash_url, script_options='{}'.format(splash_url))
+            print(splash_url)
+            launch_ail_splash_crawler(splash_url, script_options=f'{splash_url}')
 
 def api_set_nb_crawlers_to_launch(dict_splash_name):
     # TODO: check if is dict
@@ -617,11 +616,11 @@ def get_auto_crawler_all_domain(l_crawler_types=[]):
     l_crawler_types = sanitize_crawler_types(l_crawler_types)
     if len(l_crawler_types) == 1:
         return r_serv_onion.smembers(f'auto_crawler_url:{crawler_type[0]}')
-    else:
-        l_keys_name = []
-        for crawler_type in l_crawler_types:
-            l_keys_name.append(f'auto_crawler_url:{crawler_type}')
-        return r_serv_onion.sunion(l_keys_name[0], *l_keys_name[1:])
+    l_keys_name = [
+        f'auto_crawler_url:{crawler_type}' for crawler_type in l_crawler_types
+    ]
+
+    return r_serv_onion.sunion(l_keys_name[0], *l_keys_name[1:])
 
 def add_auto_crawler_in_queue(domain, domain_type, port, epoch, delta, message):
     r_serv_onion.zadd('crawler_auto_queue', int(time.time() + delta) , f'{message};{domain_type}')
@@ -646,18 +645,12 @@ def update_auto_crawler_queue():
 #### CRAWLER TASK ####
 def create_crawler_task(url, screenshot=True, har=True, depth_limit=1, max_pages=100, auto_crawler=False, crawler_delta=3600, crawler_type=None, cookiejar_uuid=None, user_agent=None):
 
-    crawler_config = {}
-    crawler_config['depth_limit'] = depth_limit
-    crawler_config['closespider_pagecount'] = max_pages
-
-    if screenshot:
-        crawler_config['png'] = True
-    else:
-        crawler_config['png'] = False
-    if har:
-        crawler_config['har'] = True
-    else:
-        crawler_config['har'] = False
+    crawler_config = {
+        'depth_limit': depth_limit,
+        'closespider_pagecount': max_pages,
+        'png': bool(screenshot),
+        'har': bool(har),
+    }
 
     if user_agent:
         crawler_config['user_agent'] = user_agent
@@ -688,30 +681,41 @@ def create_crawler_task(url, screenshot=True, har=True, depth_limit=1, max_pages
     if crawler_type=='None':
         crawler_type = None
 
-    if crawler_type:
-        if crawler_type=='tor':
-            crawler_type = 'onion'
-    else:
-        if tld == 'onion':
-            crawler_type = 'onion'
-        else:
-            crawler_type = 'regular'
+    if (
+        crawler_type
+        and crawler_type == 'tor'
+        or not crawler_type
+        and tld == 'onion'
+    ):
+        crawler_type = 'onion'
+    elif not crawler_type:
+        crawler_type = 'regular'
 
     save_crawler_config(crawler_mode, crawler_type, crawler_config, domain, url=url)
     send_url_to_crawl_in_queue(crawler_mode, crawler_type, url)
 
 def save_crawler_config(crawler_mode, crawler_type, crawler_config, domain, url=None):
     if crawler_mode == 'manual':
-        r_cache.set('crawler_config:{}:{}:{}'.format(crawler_mode, crawler_type, domain), json.dumps(crawler_config))
+        r_cache.set(
+            f'crawler_config:{crawler_mode}:{crawler_type}:{domain}',
+            json.dumps(crawler_config),
+        )
+
     elif crawler_mode == 'auto':
-        r_serv_onion.set('crawler_config:{}:{}:{}:{}'.format(crawler_mode, crawler_type, domain, url), json.dumps(crawler_config))
+        r_serv_onion.set(
+            f'crawler_config:{crawler_mode}:{crawler_type}:{domain}:{url}',
+            json.dumps(crawler_config),
+        )
 
 def send_url_to_crawl_in_queue(crawler_mode, crawler_type, url):
-    print('{}_crawler_priority_queue'.format(crawler_type), '{};{}'.format(url, crawler_mode))
-    r_serv_onion.sadd('{}_crawler_priority_queue'.format(crawler_type), '{};{}'.format(url, crawler_mode))
+    print(f'{crawler_type}_crawler_priority_queue', f'{url};{crawler_mode}')
+    r_serv_onion.sadd(
+        f'{crawler_type}_crawler_priority_queue', f'{url};{crawler_mode}'
+    )
+
     # add auto crawled url for user UI
     if crawler_mode == 'auto':
-        r_serv_onion.sadd('auto_crawler_url:{}'.format(crawler_type), url)
+        r_serv_onion.sadd(f'auto_crawler_url:{crawler_type}', url)
 
 #### ####
 #### CRAWLER TASK API ####
@@ -723,15 +727,13 @@ def api_create_crawler_task(user_id, url, screenshot=True, har=True, depth_limit
     if depth_limit:
         try:
             depth_limit = int(depth_limit)
-            if depth_limit < 0:
-                depth_limit = 0
+            depth_limit = max(depth_limit, 0)
         except ValueError:
             return ({'error':'invalid depth limit'}, 400)
     if max_pages:
         try:
             max_pages = int(max_pages)
-            if max_pages < 1:
-                max_pages = 1
+            max_pages = max(max_pages, 1)
         except ValueError:
             return ({'error':'invalid max_pages limit'}, 400)
 
@@ -767,52 +769,55 @@ def is_splash_reachable(splash_url, timeout=1.0):
         r = requests.get(splash_url , timeout=timeout)
     except Exception:
         return False
-    if r.status_code == 200:
-        return True
-    else:
-        return False
+    return r.status_code == 200
 #### ####
 
 def is_redirection(domain, last_url):
     url = urlparse(last_url)
     last_domain = url.netloc
     last_domain = last_domain.split('.')
-    last_domain = '{}.{}'.format(last_domain[-2], last_domain[-1])
+    last_domain = f'{last_domain[-2]}.{last_domain[-1]}'
     return domain != last_domain
 
 # domain up
 def create_domain_metadata(domain_type, domain, current_port, date, date_month):
     # Add to global set
-    r_serv_onion.sadd('{}_up:{}'.format(domain_type, date), domain)
-    r_serv_onion.sadd('full_{}_up'.format(domain_type), domain)
-    r_serv_onion.sadd('month_{}_up:{}'.format(domain_type, date_month), domain)
+    r_serv_onion.sadd(f'{domain_type}_up:{date}', domain)
+    r_serv_onion.sadd(f'full_{domain_type}_up', domain)
+    r_serv_onion.sadd(f'month_{domain_type}_up:{date_month}', domain)
 
     # create onion metadata
-    if not r_serv_onion.exists('{}_metadata:{}'.format(domain_type, domain)):
-        r_serv_onion.hset('{}_metadata:{}'.format(domain_type, domain), 'first_seen', date)
-    r_serv_onion.hset('{}_metadata:{}'.format(domain_type, domain), 'last_check', date)
+    if not r_serv_onion.exists(f'{domain_type}_metadata:{domain}'):
+        r_serv_onion.hset(f'{domain_type}_metadata:{domain}', 'first_seen', date)
+    r_serv_onion.hset(f'{domain_type}_metadata:{domain}', 'last_check', date)
 
     # Update domain port number
-    all_domain_ports = r_serv_onion.hget('{}_metadata:{}'.format(domain_type, domain), 'ports')
-    if all_domain_ports:
-        all_domain_ports = all_domain_ports.split(';')
-    else:
-        all_domain_ports = []
+    all_domain_ports = r_serv_onion.hget(
+        f'{domain_type}_metadata:{domain}', 'ports'
+    )
+
+    all_domain_ports = all_domain_ports.split(';') if all_domain_ports else []
     if current_port not in all_domain_ports:
         all_domain_ports.append(current_port)
-        r_serv_onion.hset('{}_metadata:{}'.format(domain_type, domain), 'ports', ';'.join(all_domain_ports))
+        r_serv_onion.hset(
+            f'{domain_type}_metadata:{domain}',
+            'ports',
+            ';'.join(all_domain_ports),
+        )
 
 # add root_item to history
 def add_domain_root_item(root_item, domain_type, domain, epoch_date, port):
     # Create/Update crawler history
-    r_serv_onion.zadd('crawler_history_{}:{}:{}'.format(domain_type, domain, port), epoch_date, root_item)
+    r_serv_onion.zadd(
+        f'crawler_history_{domain_type}:{domain}:{port}', epoch_date, root_item
+    )
 
 def create_item_metadata(item_id, domain, url, port, item_father):
-    r_serv_metadata.hset('paste_metadata:{}'.format(item_id), 'father', item_father)
-    r_serv_metadata.hset('paste_metadata:{}'.format(item_id), 'domain', '{}:{}'.format(domain, port))
-    r_serv_metadata.hset('paste_metadata:{}'.format(item_id), 'real_link', url)
+    r_serv_metadata.hset(f'paste_metadata:{item_id}', 'father', item_father)
+    r_serv_metadata.hset(f'paste_metadata:{item_id}', 'domain', f'{domain}:{port}')
+    r_serv_metadata.hset(f'paste_metadata:{item_id}', 'real_link', url)
     # add this item_id to his father
-    r_serv_metadata.sadd('paste_children:{}'.format(item_father), item_id)
+    r_serv_metadata.sadd(f'paste_children:{item_father}', item_id)
 
 def create_item_id(item_dir, domain):
     # remove /
@@ -826,17 +831,16 @@ def create_item_id(item_dir, domain):
 def save_crawled_item(item_id, item_content):
     try:
         gzipencoded = gzip.compress(item_content.encode())
-        gzip64encoded = base64.standard_b64encode(gzipencoded).decode()
-        return gzip64encoded
+        return base64.standard_b64encode(gzipencoded).decode()
     except:
-        print("file error: {}".format(item_id))
+        print(f"file error: {item_id}")
         return False
 
 def save_har(har_dir, item_id, har_content):
     if not os.path.exists(har_dir):
         os.makedirs(har_dir)
     item_id = item_id.split('/')[-1]
-    filename = os.path.join(har_dir, item_id + '.json')
+    filename = os.path.join(har_dir, f'{item_id}.json')
     with open(filename, 'w') as f:
         f.write(json.dumps(har_content))
 
@@ -871,16 +875,20 @@ def get_queue_key_by_name(queue_name):
         return '{}_crawler_queue'
 
 def get_stats_elem_to_crawl_by_queue_type(queue_type):
-    dict_stats = {}
-    for queue_name in get_all_queues_names():
-        dict_stats[queue_name] = r_serv_onion.scard(get_queue_key_by_name(queue_name).format(queue_type))
-    return dict_stats
+    return {
+        queue_name: r_serv_onion.scard(
+            get_queue_key_by_name(queue_name).format(queue_type)
+        )
+        for queue_name in get_all_queues_names()
+    }
 
 def get_all_queues_stats():
     print(get_all_crawlers_queues_types())
-    dict_stats = {}
-    for queue_type in get_crawler_all_types():
-        dict_stats[queue_type] = get_stats_elem_to_crawl_by_queue_type(queue_type)
+    dict_stats = {
+        queue_type: get_stats_elem_to_crawl_by_queue_type(queue_type)
+        for queue_type in get_crawler_all_types()
+    }
+
     for queue_type in get_all_splash():
         dict_stats[queue_type] = get_stats_elem_to_crawl_by_queue_type(queue_type)
     return dict_stats
@@ -895,10 +903,10 @@ def is_item_in_queue(queue_type, url, item_id, queue_name=None):
         queues = get_queue_key_by_name(queue_name)
 
     key = f'{url};{item_id}'
-    for queue in queues:
-        if r_serv_onion.sismember(queue.format(queue_type), key):
-            return True
-    return False
+    return any(
+        r_serv_onion.sismember(queue.format(queue_type), key)
+        for queue in queues
+    )
 
 def add_item_to_discovery_queue(queue_type, domain, subdomain, url, item_id):
     date_month = datetime.now().strftime("%Y%m")
@@ -912,18 +920,25 @@ def add_item_to_discovery_queue(queue_type, domain, subdomain, url, item_id):
     if len(subdomain.split('.')) > 3:
         subdomain = f'{subdomain[-3]}.{subdomain[-2]}.{queue_type}'
 
-    if not r_serv_onion.sismember(f'month_{queue_type}_up:{date_month}', subdomain) and not r_serv_onion.sismember(f'{queue_type}_down:{date}' , subdomain):
-        if not r_serv_onion.sismember(f'{queue_type}_domain_crawler_queue', subdomain):
-            r_serv_onion.sadd(f'{queue_type}_domain_crawler_queue', subdomain)
-            msg = f'{url};{item_id}'
-            # First time we see this domain => Add to discovery queue (priority=2)
-            if not r_serv_onion.hexists(f'{queue_type}_metadata:{subdomain}', 'first_seen'):
-                r_serv_onion.sadd(f'{queue_type}_crawler_discovery_queue', msg)
-                print(f'sent to priority queue: {subdomain}')
-            # Add to default queue (priority=3)
-            else:
-                r_serv_onion.sadd(f'{queue_type}_crawler_queue', msg)
-                print(f'sent to queue: {subdomain}')
+    if (
+        not r_serv_onion.sismember(
+            f'month_{queue_type}_up:{date_month}', subdomain
+        )
+        and not r_serv_onion.sismember(f'{queue_type}_down:{date}', subdomain)
+        and not r_serv_onion.sismember(
+            f'{queue_type}_domain_crawler_queue', subdomain
+        )
+    ):
+        r_serv_onion.sadd(f'{queue_type}_domain_crawler_queue', subdomain)
+        msg = f'{url};{item_id}'
+        # First time we see this domain => Add to discovery queue (priority=2)
+        if not r_serv_onion.hexists(f'{queue_type}_metadata:{subdomain}', 'first_seen'):
+            r_serv_onion.sadd(f'{queue_type}_crawler_discovery_queue', msg)
+            print(f'sent to priority queue: {subdomain}')
+        # Add to default queue (priority=3)
+        else:
+            r_serv_onion.sadd(f'{queue_type}_crawler_queue', msg)
+            print(f'sent to queue: {subdomain}')
 
 def queue_test_clean_up(queue_type, domain, item_id):
     date_month = datetime.now().strftime("%Y%m")
@@ -947,18 +962,19 @@ def clear_crawler_queues():
 
 ###################################################################################
 def get_nb_elem_to_crawl_by_type(queue_type): # # TODO: rename me
-    nb = r_serv_onion.scard('{}_crawler_priority_queue'.format(queue_type))
-    nb += r_serv_onion.scard('{}_crawler_discovery_queue'.format(queue_type))
-    nb += r_serv_onion.scard('{}_crawler_queue'.format(queue_type))
+    nb = r_serv_onion.scard(f'{queue_type}_crawler_priority_queue')
+    nb += r_serv_onion.scard(f'{queue_type}_crawler_discovery_queue')
+    nb += r_serv_onion.scard(f'{queue_type}_crawler_queue')
     return nb
 ###################################################################################
 
 def get_all_crawlers_queues_types():
-    all_queues_types = set()
     all_splash_name = get_all_crawlers_to_launch_splash_name()
-    for splash_name in all_splash_name:
-        all_queues_types.add(get_splash_crawler_type(splash_name))
-    all_splash_name = list()
+    all_queues_types = {
+        get_splash_crawler_type(splash_name) for splash_name in all_splash_name
+    }
+
+    all_splash_name = []
     return all_queues_types
 
 def get_crawler_queue_types_by_splash_name(splash_name):
@@ -967,9 +983,7 @@ def get_crawler_queue_types_by_splash_name(splash_name):
     #if not is_splash_used_in_discovery(splash_name)
     if crawler_type == 'tor':
         all_domain_type.append('onion')
-        all_domain_type.append('regular')
-    else:
-        all_domain_type.append('regular')
+    all_domain_type.append('regular')
     return all_domain_type
 
 def get_crawler_type_by_url(url):
@@ -981,11 +995,7 @@ def get_crawler_type_by_url(url):
     except:
         tld = unpack_url['tld']
 
-    if tld == 'onion':
-        crawler_type = 'onion'
-    else:
-        crawler_type = 'regular'
-    return crawler_type
+    return 'onion' if tld == 'onion' else 'regular'
 
 
 def get_elem_to_crawl_by_queue_type(l_queue_type):
@@ -997,13 +1007,12 @@ def get_elem_to_crawl_by_queue_type(l_queue_type):
 
     for queue_key in get_all_queues_keys():
         for queue_type in l_queue_type:
-            message = r_serv_onion.spop(queue_key.format(queue_type))
-            if message:
+            if message := r_serv_onion.spop(queue_key.format(queue_type)):
                 dict_to_crawl = {}
                 splitted = message.rsplit(';', 1)
                 if len(splitted) == 2:
                     url, item_id = splitted
-                    item_id = item_id.replace(PASTES_FOLDER+'/', '')
+                    item_id = item_id.replace(f'{PASTES_FOLDER}/', '')
                 else:
                 # # TODO: to check/refractor
                     item_id = None
@@ -1026,15 +1035,12 @@ def get_splash_api_key(reload=False): # TODO: add in db config
     return r_serv_onion.get('crawler:splash:manager:key')
 
 def get_hidden_splash_api_key(): # TODO: add in db config
-    key = get_splash_api_key()
-    if key:
+    if key := get_splash_api_key():
         if len(key)==41:
             return f'{key[:4]}*********************************{key[-4:]}'
 
 def is_valid_api_key(api_key, search=re.compile(r'[^a-zA-Z0-9_-]').search):
-    if len(api_key) != 41:
-        return False
-    return not bool(search(api_key))
+    return False if len(api_key) != 41 else not bool(search(api_key))
 
 def save_splash_manager_url_api(url, api_key):
     r_serv_onion.set('crawler:splash:manager:url', url)
@@ -1043,7 +1049,7 @@ def save_splash_manager_url_api(url, api_key):
 def get_splash_url_from_manager_url(splash_manager_url, splash_port):
     url = urlparse(splash_manager_url)
     host = url.netloc.split(':', 1)[0]
-    return '{}:{}'.format(host, splash_port)
+    return f'{host}:{splash_port}'
 
 # def is_splash_used_in_discovery(splash_name):
 #     res = r_serv_onion.hget('splash:metadata:{}'.format(splash_name), 'discovery_queue')
@@ -1057,8 +1063,7 @@ def restart_splash_docker(splash_url, splash_name):
     return _restart_splash_docker(splash_port, splash_name)
 
 def is_splash_manager_connected(delta_check=30):
-    last_check = r_cache.hget('crawler:splash:manager', 'last_check')
-    if last_check:
+    if last_check := r_cache.hget('crawler:splash:manager', 'last_check'):
         if int(time.time()) - int(last_check) > delta_check:
             ping_splash_manager()
     else:
@@ -1076,11 +1081,12 @@ def update_splash_manager_connection_status(is_connected, req_error=None):
         r_cache.hset('crawler:splash:manager', 'error', req_error['error'])
 
 def get_splash_manager_connection_metadata(force_ping=False):
-    dict_manager={}
-    if force_ping:
-        dict_manager['status'] = ping_splash_manager()
-    else:
-        dict_manager['status'] = is_splash_manager_connected()
+    dict_manager = {
+        'status': ping_splash_manager()
+        if force_ping
+        else is_splash_manager_connected()
+    }
+
     if not dict_manager['status']:
         dict_manager['status_code'] = r_cache.hget('crawler:splash:manager', 'status_code')
         dict_manager['error'] = r_cache.hget('crawler:splash:manager', 'error')
@@ -1092,7 +1098,12 @@ def ping_splash_manager():
     if not splash_manager_url:
         return False
     try:
-        req = requests.get('{}/api/v1/ping'.format(splash_manager_url), headers={"Authorization": get_splash_api_key()}, verify=False)
+        req = requests.get(
+            f'{splash_manager_url}/api/v1/ping',
+            headers={"Authorization": get_splash_api_key()},
+            verify=False,
+        )
+
         if req.status_code == 200:
             update_splash_manager_connection_status(True)
             return True
@@ -1119,10 +1130,14 @@ def ping_splash_manager():
 
 def get_splash_manager_session_uuid():
     try:
-        req = requests.get('{}/api/v1/get/session_uuid'.format(get_splash_manager_url()), headers={"Authorization": get_splash_api_key()}, verify=False)
+        req = requests.get(
+            f'{get_splash_manager_url()}/api/v1/get/session_uuid',
+            headers={"Authorization": get_splash_api_key()},
+            verify=False,
+        )
+
         if req.status_code == 200:
-            res = req.json()
-            if res:
+            if res := req.json():
                 return res['session_uuid']
         else:
             print(req.json())
@@ -1131,10 +1146,14 @@ def get_splash_manager_session_uuid():
         update_splash_manager_connection_status(False)
 
 def get_splash_manager_version():
-    splash_manager_url = get_splash_manager_url()
-    if splash_manager_url:
+    if splash_manager_url := get_splash_manager_url():
         try:
-            req = requests.get('{}/api/v1/version'.format(splash_manager_url), headers={"Authorization": get_splash_api_key()}, verify=False)
+            req = requests.get(
+                f'{splash_manager_url}/api/v1/version',
+                headers={"Authorization": get_splash_api_key()},
+                verify=False,
+            )
+
             if req.status_code == 200:
                 return req.json()['message']
             else:
@@ -1143,14 +1162,24 @@ def get_splash_manager_version():
             pass
 
 def get_all_splash_manager_containers_name():
-    req = requests.get('{}/api/v1/get/splash/all'.format(get_splash_manager_url()), headers={"Authorization": get_splash_api_key()}, verify=False)
+    req = requests.get(
+        f'{get_splash_manager_url()}/api/v1/get/splash/all',
+        headers={"Authorization": get_splash_api_key()},
+        verify=False,
+    )
+
     if req.status_code == 200:
         return req.json()
     else:
         print(req.json())
 
 def get_all_splash_manager_proxies():
-    req = requests.get('{}/api/v1/get/proxies/all'.format(get_splash_manager_url()), headers={"Authorization": get_splash_api_key()}, verify=False)
+    req = requests.get(
+        f'{get_splash_manager_url()}/api/v1/get/proxies/all',
+        headers={"Authorization": get_splash_api_key()},
+        verify=False,
+    )
+
     if req.status_code == 200:
         return req.json()
     else:
@@ -1158,7 +1187,13 @@ def get_all_splash_manager_proxies():
 
 def _restart_splash_docker(splash_port, splash_name):
     dict_to_send = {'port': splash_port, 'name': splash_name}
-    req = requests.post('{}/api/v1/splash/restart'.format(get_splash_manager_url()), headers={"Authorization": get_splash_api_key()}, verify=False, json=dict_to_send)
+    req = requests.post(
+        f'{get_splash_manager_url()}/api/v1/splash/restart',
+        headers={"Authorization": get_splash_api_key()},
+        verify=False,
+        json=dict_to_send,
+    )
+
     if req.status_code == 200:
         return req.json()
     else:
@@ -1191,67 +1226,55 @@ def get_all_splash(r_list=False):
     res = r_serv_onion.smembers('all_splash')
     if not res:
         res = set()
-    if r_list:
-        return list(res)
-    else:
-        return res
+    return list(res) if r_list else res
 
 def get_splash_proxy(splash_name):
-    return r_serv_onion.hget('splash:metadata:{}'.format(splash_name), 'proxy')
+    return r_serv_onion.hget(f'splash:metadata:{splash_name}', 'proxy')
 
 def get_splash_all_url(splash_name, r_list=False):
-    res = r_serv_onion.smembers('splash:url:{}'.format(splash_name))
+    res = r_serv_onion.smembers(f'splash:url:{splash_name}')
     if not res:
         res = set()
-    if r_list:
-        return list(res)
-    else:
-        return res
+    return list(res) if r_list else res
 
 def get_splash_name_by_url(splash_url):
-    return r_serv_onion.get('splash:map:url:name:{}'.format(splash_url))
+    return r_serv_onion.get(f'splash:map:url:name:{splash_url}')
 
 def get_splash_crawler_type(splash_name):
-    return r_serv_onion.hget('splash:metadata:{}'.format(splash_name), 'crawler_type')
+    return r_serv_onion.hget(f'splash:metadata:{splash_name}', 'crawler_type')
 
 def get_splash_crawler_description(splash_name):
-    return r_serv_onion.hget('splash:metadata:{}'.format(splash_name), 'description')
+    return r_serv_onion.hget(f'splash:metadata:{splash_name}', 'description')
 
 def get_splash_crawler_metadata(splash_name):
-    dict_splash = {}
-    dict_splash['proxy'] = get_splash_proxy(splash_name)
+    dict_splash = {'proxy': get_splash_proxy(splash_name)}
     dict_splash['type'] = get_splash_crawler_type(splash_name)
     dict_splash['description'] = get_splash_crawler_description(splash_name)
     return dict_splash
 
 def get_all_splash_crawler_metadata():
-    dict_splash = {}
-    for splash_name in get_all_splash():
-        dict_splash[splash_name] = get_splash_crawler_metadata(splash_name)
-    return dict_splash
+    return {
+        splash_name: get_splash_crawler_metadata(splash_name)
+        for splash_name in get_all_splash()
+    }
 
 def get_all_splash_by_proxy(proxy_name, r_list=False):
-    res = r_serv_onion.smembers('proxy:splash:{}'.format(proxy_name))
-    if res:
-        if r_list:
-            return list(res)
-        else:
-            return res
+    if res := r_serv_onion.smembers(f'proxy:splash:{proxy_name}'):
+        return list(res) if r_list else res
     else:
         return []
 
 def get_all_splash_name_by_crawler_type(crawler_type):
-    l_splash_name = []
-    for splash_name in get_all_splash():
-        if get_splash_crawler_type(splash_name) == crawler_type:
-            l_splash_name.append(splash_name)
-    return l_splash_name
+    return [
+        splash_name
+        for splash_name in get_all_splash()
+        if get_splash_crawler_type(splash_name) == crawler_type
+    ]
 
 def get_all_splash_url_by_crawler_type(crawler_type):
     l_splash_url = []
     for splash_name in get_all_splash_name_by_crawler_type(crawler_type):
-        for splash_url in get_splash_all_url(splash_name, r_list=True):
-            l_splash_url.append(splash_url)
+        l_splash_url.extend(iter(get_splash_all_url(splash_name, r_list=True)))
     return l_splash_url
 
 def delete_all_splash_containers():
@@ -1259,45 +1282,40 @@ def delete_all_splash_containers():
         delete_splash_container(splash_name)
 
 def delete_splash_container(splash_name):
-    r_serv_onion.srem('proxy:splash:{}'.format(get_splash_proxy(splash_name)), splash_name)
-    r_serv_onion.delete('splash:metadata:{}'.format(splash_name))
+    r_serv_onion.srem(f'proxy:splash:{get_splash_proxy(splash_name)}', splash_name)
+    r_serv_onion.delete(f'splash:metadata:{splash_name}')
 
     for splash_url in get_splash_all_url(splash_name):
-        r_serv_onion.delete('splash:map:url:name:{}'.format(splash_url), splash_name)
-        r_serv_onion.srem('splash:url:{}'.format(splash_name), splash_url)
+        r_serv_onion.delete(f'splash:map:url:name:{splash_url}', splash_name)
+        r_serv_onion.srem(f'splash:url:{splash_name}', splash_url)
     r_serv_onion.srem('all_splash', splash_name)
     ## -- ##
 
     ## PROXY ##
 def get_all_proxies(r_list=False):
-    res = r_serv_onion.smembers('all_proxy')
-    if res:
-        return list(res)
-    else:
-        return []
+    return list(res) if (res := r_serv_onion.smembers('all_proxy')) else []
 
 def delete_all_proxies():
     for proxy_name in get_all_proxies():
         delete_proxy(proxy_name)
 
 def get_proxy_host(proxy_name):
-    return r_serv_onion.hget('proxy:metadata:{}'.format(proxy_name), 'host')
+    return r_serv_onion.hget(f'proxy:metadata:{proxy_name}', 'host')
 
 def get_proxy_port(proxy_name):
-    return r_serv_onion.hget('proxy:metadata:{}'.format(proxy_name), 'port')
+    return r_serv_onion.hget(f'proxy:metadata:{proxy_name}', 'port')
 
 def get_proxy_type(proxy_name):
-    return r_serv_onion.hget('proxy:metadata:{}'.format(proxy_name), 'type')
+    return r_serv_onion.hget(f'proxy:metadata:{proxy_name}', 'type')
 
 def get_proxy_crawler_type(proxy_name):
-    return r_serv_onion.hget('proxy:metadata:{}'.format(proxy_name), 'crawler_type')
+    return r_serv_onion.hget(f'proxy:metadata:{proxy_name}', 'crawler_type')
 
 def get_proxy_description(proxy_name):
-    return r_serv_onion.hget('proxy:metadata:{}'.format(proxy_name), 'description')
+    return r_serv_onion.hget(f'proxy:metadata:{proxy_name}', 'description')
 
 def get_proxy_metadata(proxy_name):
-    meta_dict = {}
-    meta_dict['host'] = get_proxy_host(proxy_name)
+    meta_dict = {'host': get_proxy_host(proxy_name)}
     meta_dict['port'] = get_proxy_port(proxy_name)
     meta_dict['type'] = get_proxy_type(proxy_name)
     meta_dict['crawler_type'] = get_proxy_crawler_type(proxy_name)
@@ -1305,10 +1323,10 @@ def get_proxy_metadata(proxy_name):
     return meta_dict
 
 def get_all_proxies_metadata():
-    all_proxy_dict = {}
-    for proxy_name in get_all_proxies():
-        all_proxy_dict[proxy_name] = get_proxy_metadata(proxy_name)
-    return all_proxy_dict
+    return {
+        proxy_name: get_proxy_metadata(proxy_name)
+        for proxy_name in get_all_proxies()
+    }
 
 # def set_proxy_used_in_discovery(proxy_name, value):
 #     r_serv_onion.hset('splash:metadata:{}'.format(splash_name), 'discovery_queue', value)
@@ -1317,7 +1335,7 @@ def delete_proxy(proxy_name): # # TODO: force delete (delete all proxy)
     proxy_splash = get_all_splash_by_proxy(proxy_name)
     #if proxy_splash:
     #    print('error, a splash container is using this proxy')
-    r_serv_onion.delete('proxy:metadata:{}'.format(proxy_name))
+    r_serv_onion.delete(f'proxy:metadata:{proxy_name}')
     r_serv_onion.srem('all_proxy', proxy_name)
     ## -- ##
 
@@ -1332,42 +1350,51 @@ def load_all_splash_containers():
         if not proxy:
             proxy = {'name': 'no_proxy', 'crawler_type': 'web'}
 
-        r_serv_onion.sadd('proxy:splash:{}'.format(proxy['name']), splash_name)
+        r_serv_onion.sadd(f"proxy:splash:{proxy['name']}", splash_name)
 
-        r_serv_onion.hset('splash:metadata:{}'.format(splash_name), 'crawler_type', proxy['crawler_type'])
-        r_serv_onion.hset('splash:metadata:{}'.format(splash_name), 'proxy', proxy['name'])
-        description = all_splash_containers_name[splash_name].get('description', None)
-        if description:
-            r_serv_onion.hset('splash:metadata:{}'.format(splash_name), 'description', description)
+        r_serv_onion.hset(
+            f'splash:metadata:{splash_name}',
+            'crawler_type',
+            proxy['crawler_type'],
+        )
+
+        r_serv_onion.hset(f'splash:metadata:{splash_name}', 'proxy', proxy['name'])
+        if description := all_splash_containers_name[splash_name].get(
+            'description', None
+        ):
+            r_serv_onion.hset(f'splash:metadata:{splash_name}', 'description', description)
 
         for port in all_splash_containers_name[splash_name]['ports']:
             splash_url = get_splash_url_from_manager_url(get_splash_manager_url(), port)
-            r_serv_onion.sadd('splash:url:{}'.format(splash_name), splash_url)
-            r_serv_onion.set('splash:map:url:name:{}'.format(splash_url), splash_name)
+            r_serv_onion.sadd(f'splash:url:{splash_name}', splash_url)
+            r_serv_onion.set(f'splash:map:url:name:{splash_url}', splash_name)
 
 def load_all_proxy():
     delete_all_proxies()
     all_proxies = get_all_splash_manager_proxies()
     for proxy_name in all_proxies:
         proxy_dict = all_proxies[proxy_name]
-        r_serv_onion.hset('proxy:metadata:{}'.format(proxy_name), 'host', proxy_dict['host'])
-        r_serv_onion.hset('proxy:metadata:{}'.format(proxy_name), 'port', proxy_dict['port'])
-        r_serv_onion.hset('proxy:metadata:{}'.format(proxy_name), 'type', proxy_dict['type'])
-        r_serv_onion.hset('proxy:metadata:{}'.format(proxy_name), 'crawler_type', proxy_dict['crawler_type'])
-        description = all_proxies[proxy_name].get('description', None)
-        if description:
-            r_serv_onion.hset('proxy:metadata:{}'.format(proxy_name), 'description', description)
+        r_serv_onion.hset(f'proxy:metadata:{proxy_name}', 'host', proxy_dict['host'])
+        r_serv_onion.hset(f'proxy:metadata:{proxy_name}', 'port', proxy_dict['port'])
+        r_serv_onion.hset(f'proxy:metadata:{proxy_name}', 'type', proxy_dict['type'])
+        r_serv_onion.hset(
+            f'proxy:metadata:{proxy_name}',
+            'crawler_type',
+            proxy_dict['crawler_type'],
+        )
+
+        if description := all_proxies[proxy_name].get('description', None):
+            r_serv_onion.hset(f'proxy:metadata:{proxy_name}', 'description', description)
         r_serv_onion.sadd('all_proxy', proxy_name)
 
 def reload_splash_and_proxies_list():
-    if ping_splash_manager():
-        # LOAD PROXIES containers
-        load_all_proxy()
-        # LOAD SPLASH containers
-        load_all_splash_containers()
-        return True
-    else:
+    if not ping_splash_manager():
         return False
+    # LOAD PROXIES containers
+    load_all_proxy()
+    # LOAD SPLASH containers
+    load_all_splash_containers()
+    return True
     # # TODO: kill crawler screen ?
     ## -- ##
 
@@ -1402,19 +1429,22 @@ def test_ail_crawlers():
 
     splash_url = get_all_splash_url_by_crawler_type('tor')
     if not splash_url:
-        error_message = f'Error: No Tor Splash Launched'
+        error_message = 'Error: No Tor Splash Launched'
         print(error_message)
         save_test_ail_crawlers_result(False, error_message)
         return False
     splash_url = splash_url[0]
     commit_id = git_status.get_last_commit_id_from_local()
-    crawler_options = {'html': True,
-                        'har': False,
-                        'png': False,
-                        'depth_limit': 0,
-                        'closespider_pagecount': 100,
-                        'cookiejar_uuid': None,
-                        'user_agent': commit_id + '-AIL SPLASH CRAWLER'}
+    crawler_options = {
+        'html': True,
+        'har': False,
+        'png': False,
+        'depth_limit': 0,
+        'closespider_pagecount': 100,
+        'cookiejar_uuid': None,
+        'user_agent': f'{commit_id}-AIL SPLASH CRAWLER',
+    }
+
     date = {'date_day': datetime.now().strftime("%Y%m%d"),
             'date_month': datetime.now().strftime("%Y%m"),
             'epoch': int(time.time())}
@@ -1443,7 +1473,7 @@ def test_ail_crawlers():
     ## LAUNCH CRAWLER, TEST MODE ##
     set_current_crawler_status(splash_url, 'CRAWLER TEST', started_time=True, crawled_domain='TEST DOMAIN', crawler_type='onion')
     UUID = str(uuid.uuid4())
-    r_cache.set('crawler_request:{}'.format(UUID), json.dumps(crawler_config))
+    r_cache.set(f'crawler_request:{UUID}', json.dumps(crawler_config))
 
     ## LAUNCH CRAWLER, TEST MODE ##
     tor_crawler_script = os.path.join(os.environ['AIL_BIN'], 'torcrawler/tor_crawler.py')
@@ -1453,10 +1483,7 @@ def test_ail_crawlers():
         time.sleep(1)
 
     if process.returncode == 0:
-        # Scrapy-Splash ERRORS
-        stderr = process.stdout.read().decode()
-        #print(stderr)
-        if stderr:
+        if stderr := process.stdout.read().decode():
             print(f'stderr: {stderr}')
             save_test_ail_crawlers_result(False, f'Error: {stderr}')
             set_current_crawler_status(splash_url, 'Error')
@@ -1465,7 +1492,7 @@ def test_ail_crawlers():
         #print(output)
         # error: splash:Connection to proxy refused
         if 'Connection to proxy refused' in output:
-            print('{} SPASH, PROXY DOWN OR BAD CONFIGURATION'.format(splash_url))
+            print(f'{splash_url} SPASH, PROXY DOWN OR BAD CONFIGURATION')
             save_test_ail_crawlers_result(False, 'SPASH, PROXY DOWN OR BAD CONFIGURATION')
             set_current_crawler_status(splash_url, 'Error')
             return False

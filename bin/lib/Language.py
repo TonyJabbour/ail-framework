@@ -219,8 +219,7 @@ def get_language_from_iso(iso_language):
 def get_languages_from_iso(l_iso_languages, sort=False):
     l_languages = []
     for iso_language in l_iso_languages:
-        language = get_language_from_iso(iso_language)
-        if language:
+        if language := get_language_from_iso(iso_language):
             l_languages.append(language)
     if sort:
         l_languages = sorted(l_languages)
@@ -232,8 +231,7 @@ def get_iso_from_language(language):
 def get_iso_from_languages(l_languages, sort=False):
     l_iso = []
     for language in l_languages:
-        iso_lang = get_iso_from_language(language)
-        if iso_lang:
+        if iso_lang := get_iso_from_language(language):
             l_iso.append(iso_lang)
     if sort:
         l_iso = sorted(l_iso)

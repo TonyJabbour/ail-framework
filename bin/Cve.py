@@ -46,12 +46,8 @@ class Cve(AbstractModule):
         filepath, count = message.split()
         paste = Paste.Paste(filepath)
         content = paste.get_p_content()
-        
-        # list of the regex results in the Paste, may be null
-        results = set(self.reg_cve.findall(content))
 
-        # if the list is positive, we consider the Paste may contain a list of cve
-        if len(results) > 0:
+        if results := set(self.reg_cve.findall(content)):
             warning = f'{paste.p_name} contains CVEs'
             print(warning)
             self.redis_logger.warning(warning)

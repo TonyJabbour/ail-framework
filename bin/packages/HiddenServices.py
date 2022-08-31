@@ -56,7 +56,7 @@ class HiddenServices(object):
         self.port = port
         self.tags = {}
 
-        if type == 'onion' or type == 'regular':
+        if type in ['onion', 'regular']:
             self.paste_directory = os.path.join(os.environ['AIL_HOME'], config_loader.get_config_str("Directories", "pastes"))
             self.paste_crawled_directory = os.path.join(self.paste_directory, config_loader.get_config_str("Directories", "crawled"))
             self.paste_crawled_directory_name = config_loader.get_config_str("Directories", "crawled")
@@ -64,10 +64,6 @@ class HiddenServices(object):
         elif type == 'i2p':
             self.paste_directory = os.path.join(os.environ['AIL_HOME'], config_loader.get_config_str("Directories", "crawled_screenshot"))
             self.screenshot_directory = config_loader.get_files_directory('screenshot')
-        else:
-            ## TODO: # FIXME: add error
-            pass
-
         config_loader = None
 
     #def remove_absolute_path_link(self, key, value):
@@ -82,33 +78,36 @@ class HiddenServices(object):
         return children
 
     def get_origin_paste_name(self):
-        origin_item = self.r_serv_onion.hget('onion_metadata:{}'.format(self.domain), 'paste_parent')
+        origin_item = self.r_serv_onion.hget(
+            f'onion_metadata:{self.domain}', 'paste_parent'
+        )
+
         if origin_item is None:
             return ''
-        elif origin_item == 'auto' or origin_item == 'manual':
+        elif origin_item in ['auto', 'manual']:
             return origin_item
-        return origin_item.replace(self.paste_directory+'/', '')
+        return origin_item.replace(f'{self.paste_directory}/', '')
 
     def get_domain_tags(self, update=False):
-        if not update:
-            return self.tags
-        else:
+        if update:
             self.get_last_crawled_pastes()
-            return self.tags
+        return self.tags
 
     def update_domain_tags(self, item):
         if item:
 
-            if self.r_serv_metadata.exists('tag:{}'.format(item)):
-                p_tags = self.r_serv_metadata.smembers('tag:{}'.format(item))
-            # update path here
+            if self.r_serv_metadata.exists(f'tag:{item}'):
+                p_tags = self.r_serv_metadata.smembers(f'tag:{item}')
+            elif self.paste_directory in item:
+                p_tags = self.r_serv_metadata.smembers(
+                    f"tag:{item.replace(f'{self.paste_directory}/', '')}"
+                )
+
             else:
-                # need to remove it
-                if self.paste_directory in item:
-                    p_tags = self.r_serv_metadata.smembers('tag:{}'.format(item.replace(self.paste_directory+'/', '')))
-                # need to remove it
-                else:
-                    p_tags = self.r_serv_metadata.smembers('tag:{}'.format(os.path.join(self.paste_directory, item)))
+                p_tags = self.r_serv_metadata.smembers(
+                    f'tag:{os.path.join(self.paste_directory, item)}'
+                )
+
             for tag in p_tags:
                 self.tags[tag] = self.tags.get(tag, 0) + 1
 
@@ -118,31 +117,40 @@ class HiddenServices(object):
             epoch_val = int(epoch_val) # force int
             try:
                 # domain down
-                if int(res) == epoch_val:
-                    status = False
-                # domain up
-                else:
-                    status = True
+                status = int(res) != epoch_val
             except ValueError:
                 status = True
-            epoch_val = int(epoch_val) # force int
+            epoch_val = epoch_val
             epoch_list.append((epoch_val, time.strftime('%Y/%m/%d - %H:%M.%S', time.gmtime(epoch_val)), status))
         return epoch_list
 
     def get_domain_crawled_history(self):
-        return self.r_serv_onion.zrange('crawler_history_{}:{}:{}'.format(self.type, self.domain, self.port), 0, -1, withscores=True)
+        return self.r_serv_onion.zrange(
+            f'crawler_history_{self.type}:{self.domain}:{self.port}',
+            0,
+            -1,
+            withscores=True,
+        )
 
     def get_first_crawled(self):
-        res = self.r_serv_onion.zrange('crawler_history_{}:{}:{}'.format(self.type, self.domain, self.port), 0, 0, withscores=True)
-        if res:
+        if res := self.r_serv_onion.zrange(
+            f'crawler_history_{self.type}:{self.domain}:{self.port}',
+            0,
+            0,
+            withscores=True,
+        ):
             res = res[0]
             return {'root_item':res[0], 'epoch':int(res[1])}
         else:
             return {}
 
     def get_last_crawled(self):
-        res = self.r_serv_onion.zrevrange('crawler_history_{}:{}:{}'.format(self.type, self.domain, self.port), 0, 0, withscores=True)
-        if res:
+        if res := self.r_serv_onion.zrevrange(
+            f'crawler_history_{self.type}:{self.domain}:{self.port}',
+            0,
+            0,
+            withscores=True,
+        ):
             return {'root_item':res[0][0], 'epoch':res[0][1]}
         else:
             return {}
@@ -151,8 +159,11 @@ class HiddenServices(object):
     def get_domain_crawled_core_item(self, epoch=None):
         core_item = {}
         if epoch:
-            list_root = self.r_serv_onion.zrevrangebyscore('crawler_history_{}:{}:{}'.format(self.type, self.domain, self.port), int(epoch), int(epoch))
-            if list_root:
+            if list_root := self.r_serv_onion.zrevrangebyscore(
+                f'crawler_history_{self.type}:{self.domain}:{self.port}',
+                int(epoch),
+                int(epoch),
+            ):
                 core_item['root_item'] = list_root[0]
                 core_item['epoch'] = epoch
                 return core_item
@@ -182,7 +193,7 @@ class HiddenServices(object):
         if father is None:
             return []
         l_crawled_pastes = []
-        key = 'paste_children:{}'.format(father)
+        key = f'paste_children:{father}'
         paste_childrens = self.r_serv_metadata.smembers(key)
         for children in paste_childrens:
             children = self.update_item_path_children(key, children)
@@ -193,23 +204,26 @@ class HiddenServices(object):
         return l_crawled_pastes
 
     def get_item_link(self, item):
-        link = self.r_serv_metadata.hget('paste_metadata:{}'.format(item), 'real_link')
+        link = self.r_serv_metadata.hget(f'paste_metadata:{item}', 'real_link')
         if link is None:
             if self.paste_directory in item:
-                self.r_serv_metadata.hget('paste_metadata:{}'.format(item.replace(self.paste_directory+'/', '')), 'real_link')
+                self.r_serv_metadata.hget(
+                    f"paste_metadata:{item.replace(f'{self.paste_directory}/', '')}",
+                    'real_link',
+                )
+
             else:
                 key = os.path.join(self.paste_directory, item)
-                link = self.r_serv_metadata.hget('paste_metadata:{}'.format(key), 'real_link')
-                #if link:
-                    #self.remove_absolute_path_link(key, link)
+                link = self.r_serv_metadata.hget(f'paste_metadata:{key}', 'real_link')
+                        #if link:
+                            #self.remove_absolute_path_link(key, link)
 
         return link
 
     def get_all_links(self, l_items):
         dict_links = {}
         for item in l_items:
-            link = self.get_item_link(item)
-            if link:
+            if link := self.get_item_link(item):
                 dict_links[item] = link
         return dict_links
 
@@ -220,9 +234,9 @@ class HiddenServices(object):
 
         set_domain = set()
         for paste in l_paste:
-            paste_childrens = self.r_serv_metadata.smembers('paste_children:{}'.format(paste))
+            paste_childrens = self.r_serv_metadata.smembers(f'paste_children:{paste}')
             for children in paste_childrens:
-                if not self.domain in children:
+                if self.domain not in children:
                     set_domain.add((children.split('.onion')[0]+'.onion').split('/')[-1])
 
         return set_domain
@@ -243,9 +257,19 @@ class HiddenServices(object):
     '''
 
     def get_item_screenshot(self, item):
-        screenshot = self.r_serv_metadata.hget('paste_metadata:{}'.format(item), 'screenshot')
-        if screenshot:
-            screenshot =  os.path.join(screenshot[0:2], screenshot[2:4], screenshot[4:6], screenshot[6:8], screenshot[8:10], screenshot[10:12], screenshot[12:])
+        if screenshot := self.r_serv_metadata.hget(
+            f'paste_metadata:{item}', 'screenshot'
+        ):
+            screenshot = os.path.join(
+                screenshot[:2],
+                screenshot[2:4],
+                screenshot[4:6],
+                screenshot[6:8],
+                screenshot[8:10],
+                screenshot[10:12],
+                screenshot[12:],
+            )
+
             return screenshot
         return ''
 
@@ -254,17 +278,19 @@ class HiddenServices(object):
         for paste in l_crawled_pastes:
             ## FIXME: # TODO: remove me
             origin_paste = paste
-            paste= paste.replace(self.paste_directory+'/', '')
+            paste = paste.replace(f'{self.paste_directory}/', '')
 
-            screenshot = self.get_item_screenshot(paste)
-            if screenshot:
+            if screenshot := self.get_item_screenshot(paste):
                 l_screenshot_paste.append({'screenshot': screenshot, 'item': origin_paste})
 
         if len(l_screenshot_paste) > num_screenshot:
-            l_random_screenshot = []
-            for index in random.sample( range(0, len(l_screenshot_paste)), num_screenshot ):
-                l_random_screenshot.append(l_screenshot_paste[index])
-            return l_random_screenshot
+            return [
+                l_screenshot_paste[index]
+                for index in random.sample(
+                    range(len(l_screenshot_paste)), num_screenshot
+                )
+            ]
+
         else:
             return l_screenshot_paste
 
@@ -273,14 +299,13 @@ class HiddenServices(object):
         for paste in l_crawled_pastes:
             ## FIXME: # TODO: remove me
             origin_paste = paste
-            paste= paste.replace(self.paste_directory+'/', '')
+            paste = paste.replace(f'{self.paste_directory}/', '')
 
-            screenshot = self.get_item_screenshot(paste)
-            if screenshot:
-                screenshot = screenshot + '.png'
+            if screenshot := self.get_item_screenshot(paste):
+                screenshot = f'{screenshot}.png'
                 screenshot_full_path = os.path.join(self.screenshot_directory_screenshot, screenshot)
                 if filename:
-                    screen_file_name = os.path.basename(paste) + '.png'
+                    screen_file_name = f'{os.path.basename(paste)}.png'
                     l_screenshot_paste.append( (screenshot_full_path, screen_file_name) )
                 else:
                     l_screenshot_paste.append(screenshot_full_path)
@@ -291,7 +316,7 @@ class HiddenServices(object):
         for item in l_items:
             item = os.path.join(self.PASTES_FOLDER, item)
             if filename:
-                file_name = os.path.basename(item) + '.gz'
+                file_name = f'{os.path.basename(item)}.gz'
                 l_full_items.append( (item, file_name) )
             else:
                 l_full_items.append(item)
@@ -299,26 +324,30 @@ class HiddenServices(object):
 
     def get_crawled_pastes_by_date(self, date):
 
-        pastes_path = os.path.join(self.paste_crawled_directory, date[0:4], date[4:6], date[6:8])
-        paste_parent = self.r_serv_onion.hget('onion_metadata:{}'.format(self.domain), 'last_check')
+        pastes_path = os.path.join(
+            self.paste_crawled_directory, date[:4], date[4:6], date[6:8]
+        )
 
-        l_crawled_pastes = []
-        return l_crawled_pastes
+        paste_parent = self.r_serv_onion.hget(
+            f'onion_metadata:{self.domain}', 'last_check'
+        )
+
+
+        return []
 
     def get_all_har(self, l_pastes, filename=False):
         all_har = []
         for item in l_pastes:
             if filename:
-                all_har.append( (self.get_item_har(item), os.path.basename(item) + '.json') )
+                all_har.append((self.get_item_har(item), f'{os.path.basename(item)}.json'))
             else:
                 all_har.append(self.get_item_har(item))
         return all_har
 
 
     def get_item_har(self, item_path):
-        item_path = item_path.replace('{}/'.format(self.paste_crawled_directory_name), '', 1)
-        har_path = os.path.join(self.screenshot_directory, item_path) + '.json'
-        return har_path
+        item_path = item_path.replace(f'{self.paste_crawled_directory_name}/', '', 1)
+        return f'{os.path.join(self.screenshot_directory, item_path)}.json'
 
     def create_domain_basic_archive(self, l_pastes):
         all_har = self.get_all_har(l_pastes, filename=True)
@@ -358,7 +387,10 @@ class HiddenServices(object):
         file_content = ''
         dict_url = self.get_all_links(list_items)
         for key in dict_url:
-            file_content = '{}\n{}    :    {}'.format(file_content, os.path.basename(key), dict_url[key])
+            file_content = (
+                f'{file_content}\n{os.path.basename(key)}    :    {dict_url[key]}'
+            )
+
         return file_content
 
 

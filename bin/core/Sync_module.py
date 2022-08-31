@@ -58,33 +58,29 @@ class Sync_module(AbstractModule):
         #  Extract object from message
         # # TODO: USE JSON DICT ????
         mess_split = message.split(';')
-        if len(mess_split) == 3:
-            obj_type = mess_split[0]
-            obj_subtype = mess_split[1]
-            obj_id = mess_split[2]
+        if len(mess_split) != 3:
+            # Malformed message
+            raise Exception(f'too many values to unpack (expected 3) given {len(mess_split)} with message {message}')
+        obj_type = mess_split[0]
+        obj_subtype = mess_split[1]
+        obj_id = mess_split[2]
 
-            # OBJECT => Item
-            if obj_type == 'item':
-                obj = Item(obj_id)
-                tags = obj.get_tags(r_set=True)
+        # OBJECT => Item
+        if obj_type == 'item':
+            obj = Item(obj_id)
+            tags = obj.get_tags(r_set=True)
 
             # check filter + tags
             #print(message)
-            for queue_uuid in self.dict_sync_queues:
-                filter_tags = self.dict_sync_queues[queue_uuid]['filter']
-                if filter_tags and tags:
-                    #print(f'tags: {tags} filter: {filter_tags}')
-                    if filter_tags.issubset(tags):
-                        obj_dict = obj.get_default_meta()
-                        # send to queue push and/or pull
-                        for dict_ail in self.dict_sync_queues[queue_uuid]['ail_instances']:
-                            print(f'ail_uuid: {dict_ail["ail_uuid"]} obj: {message}')
-                            ail_2_ail.add_object_to_sync_queue(queue_uuid, dict_ail['ail_uuid'], obj_dict,
-                                                            push=dict_ail['push'], pull=dict_ail['pull'])
-
-        else:
-            # Malformed message
-            raise Exception(f'too many values to unpack (expected 3) given {len(mess_split)} with message {message}')
+        for queue_uuid in self.dict_sync_queues:
+            filter_tags = self.dict_sync_queues[queue_uuid]['filter']
+            if filter_tags and tags and filter_tags.issubset(tags):
+                obj_dict = obj.get_default_meta()
+                # send to queue push and/or pull
+                for dict_ail in self.dict_sync_queues[queue_uuid]['ail_instances']:
+                    print(f'ail_uuid: {dict_ail["ail_uuid"]} obj: {message}')
+                    ail_2_ail.add_object_to_sync_queue(queue_uuid, dict_ail['ail_uuid'], obj_dict,
+                                                    push=dict_ail['push'], pull=dict_ail['pull'])
 
 
 if __name__ == '__main__':

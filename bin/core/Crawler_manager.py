@@ -19,18 +19,16 @@ config_loader = None
 # # TODO: handle mutltiple splash_manager
 if __name__ == '__main__':
 
-    is_manager_connected = crawlers.ping_splash_manager()
-    if not is_manager_connected:
-        print('Error, Can\'t connect to Splash manager')
-        session_uuid = None
-    else:
+    if is_manager_connected := crawlers.ping_splash_manager():
         print('Splash manager connected')
         session_uuid = crawlers.get_splash_manager_session_uuid()
         is_manager_connected = crawlers.reload_splash_and_proxies_list()
         print(is_manager_connected)
-        if is_manager_connected:
-            if crawlers.test_ail_crawlers():
-                crawlers.relaunch_crawlers()
+        if is_manager_connected and crawlers.test_ail_crawlers():
+            crawlers.relaunch_crawlers()
+    else:
+        print('Error, Can\'t connect to Splash manager')
+        session_uuid = None
     last_check = int(time.time())
 
     while True:
@@ -54,10 +52,6 @@ if __name__ == '__main__':
             last_check = int(time.time())
 
             # # TODO: lauch crawlers if was never connected
-        # refresh splash and proxy list
-        elif False:
-            crawlers.reload_splash_and_proxies_list()
-            print('list of splash and proxies refreshed')
         else:
             time.sleep(5)
 

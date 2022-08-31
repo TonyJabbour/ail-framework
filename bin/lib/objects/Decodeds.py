@@ -51,11 +51,15 @@ class Decoded(AbstractObject):
         pass
 
     def get_link(self, flask_context=False):
-        if flask_context:
-            url = url_for('correlation.show_correlation', object_type="decoded", correlation_id=value)
-        else:
-            url = f'{baseurl}/correlation/show_correlation?object_type={self.type}&correlation_id={self.id}'
-        return url
+        return (
+            url_for(
+                'correlation.show_correlation',
+                object_type="decoded",
+                correlation_id=value,
+            )
+            if flask_context
+            else f'{baseurl}/correlation/show_correlation?object_type={self.type}&correlation_id={self.id}'
+        )
 
     def get_svg_icon(self):
         file_type = self.get_file_type()

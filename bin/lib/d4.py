@@ -34,16 +34,14 @@ def get_d4_client_config():
     return d4_client_config
 
 def is_passive_dns_enabled(cache=True):
-    if cache:
-        res = r_cache.get('d4:passivedns:enabled')
-        if res is None:
-            res = r_serv_db.hget('d4:passivedns', 'enabled') == 'True'
-            r_cache.set('d4:passivedns:enabled', res)
-            return res
-        else:
-            return res == 'True'
-    else:
+    if not cache:
         return r_serv_db.hget('d4:passivedns', 'enabled') == 'True'
+    res = r_cache.get('d4:passivedns:enabled')
+    if res is not None:
+        return res == 'True'
+    res = r_serv_db.hget('d4:passivedns', 'enabled') == 'True'
+    r_cache.set('d4:passivedns:enabled', res)
+    return res
 
 def change_passive_dns_state(new_state):
     old_state = is_passive_dns_enabled(cache=False)
@@ -68,7 +66,6 @@ def get_config_last_update_time():
 
 def create_d4_client():
     if is_passive_dns_enabled():
-        d4_client = d4_pyclient.D4Client(get_d4_client_config(), False)
-        return d4_client
+        return d4_pyclient.D4Client(get_d4_client_config(), False)
     else:
         return None

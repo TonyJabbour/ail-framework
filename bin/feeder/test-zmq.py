@@ -14,7 +14,7 @@ port = "5556"
 
 context = zmq.Context()
 socket = context.socket(zmq.SUB)
-socket.connect ("tcp://crf.circl.lu:%s" % port)
+socket.connect(f"tcp://crf.circl.lu:{port}")
 
 # 101 Name of the pastes only
 # 102 Full pastes in raw base64(gz)

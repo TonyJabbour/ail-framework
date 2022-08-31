@@ -28,27 +28,24 @@ def init_config(config_path=default_config_path):
     return config
 
 def init_module_config(module_json, config, config_path=default_config_path):
-    if 'config' in module_json['meta']:
-        if module_json['meta']['config']:
-            if module_json['name'] not in config:
-                config.add_section(module_json['name'])
-            for config_var in module_json['meta']['config']:
-                if config_var not in config[module_json['name']]:
-                    config.set(module_json['name'], config_var, '')
+    if 'config' in module_json['meta'] and module_json['meta']['config']:
+        if module_json['name'] not in config:
+            config.add_section(module_json['name'])
+        for config_var in module_json['meta']['config']:
+            if config_var not in config[module_json['name']]:
+                config.set(module_json['name'], config_var, '')
     return config
 
 def load_modules_list():
-    req = requests.get('{}/modules'.format(misp_module_url))
+    req = requests.get(f'{misp_module_url}/modules')
     if req.status_code == 200:
         all_misp_modules = req.json()
-        all_modules = []
-        for module_json in all_misp_modules:
-
-            #filter module-types
-            if 'hover' in module_json['meta']['module-type'] or 'expansion' in module_json['meta']['module-type']:
-                all_modules.append(module_json)
-
-            # # TODO: handle import/export modules
+        all_modules = [
+            module_json
+            for module_json in all_misp_modules
+            if 'hover' in module_json['meta']['module-type']
+            or 'expansion' in module_json['meta']['module-type']
+        ]
 
         config = init_config()
         r_serv.delete('misp_modules')
@@ -69,30 +66,26 @@ def build_config_json(module_name):
     dict_config = {}
     if module_name in misp_module_config:
         for config_key in misp_module_config[module_name]:
-            config_value = misp_module_config[module_name][config_key]
-            if config_value:
+            if config_value := misp_module_config[module_name][config_key]:
                 dict_config[config_key] = config_value
     return dict_config
 
 def build_enrichment_request_json(module_name, var_name, var_value):
     # # TODO: add error handler
     request_dict = {'module': module_name, var_name: var_value}
-    # add config
-    config_json = build_config_json(module_name)
-    if config_json:
+    if config_json := build_config_json(module_name):
         request_dict['config'] = config_json
     return json.dumps(request_dict)
 
 def misp_module_enrichment_request(misp_module_url, misp_module_port, request_content):
     # # TODO: check if module is enabled
-    endpoint_url = '{}:{}/query'.format(misp_module_url, misp_module_port)
+    endpoint_url = f'{misp_module_url}:{misp_module_port}/query'
     req = requests.post(endpoint_url, headers={'Content-Type': 'application/json'}, data=request_content)
     if req.status_code == 200:
-        response = req.json()
-        if response:
+        if response := req.json():
             return parse_module_enrichment_response(response)
     else:
-        print('error: {} Enrichment service not reachable.'.format(req.status_code,))
+        print(f'error: {req.status_code} Enrichment service not reachable.')
         return ''
 
 def parse_module_enrichment_response(misp_module_response):
@@ -103,13 +96,11 @@ def parse_module_enrichment_response(misp_module_response):
         response_types = []
         for result in misp_module_response['results']:
             # get all types
-            for resp_type in result['types']:
-                response_types.append(resp_type)
+            response_types.extend(iter(result['types']))
             # get all values
-            for resp_value in result['values']:
-                response_values.append(resp_value)
-        # TODO: handle / verify / use response types
-        #print(response_types)
+            response_values.extend(iter(result['values']))
+            # TODO: handle / verify / use response types
+            #print(response_types)
     return response_values
 
 if __name__ == "__main__":

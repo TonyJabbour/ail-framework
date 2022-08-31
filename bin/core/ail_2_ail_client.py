@@ -24,10 +24,7 @@ from lib.ConfigLoader import ConfigLoader
 
 config_loader = ConfigLoader()
 local_addr = config_loader.get_config_str('AIL_2_AIL', 'local_addr')
-if not local_addr or local_addr == None:
-    local_addr = None
-else:
-    local_addr = (local_addr, 0)
+local_addr = None if not local_addr or local_addr is None else (local_addr, 0)
 config_loader = None
 
 
@@ -138,7 +135,7 @@ async def ail_to_ail_client(ail_uuid, sync_mode, api, ail_key=None, client_id=No
             elif sync_mode == 'api':
                 await api_request(websocket, ail_uuid)
                 await websocket.close()
-    except websockets.exceptions.InvalidStatusCode as e:
+    except (websockets.exceptions.InvalidStatusCode, websockets.exceptions.ConnectionClosedError, websockets.exceptions.InvalidURI, ConnectionError) as e:
         status_code = e.status_code
         error_message = ''
         # success
@@ -156,23 +153,6 @@ async def ail_to_ail_client(ail_uuid, sync_mode, api, ail_key=None, client_id=No
             sys.stderr.write(error_message)
             redis_logger.warning(f'{ail_uuid}: {error_message}')
             ail_2_ail.save_ail_server_error(ail_uuid, error_message)
-    except websockets.exceptions.ConnectionClosedError as e:
-        error_message = ail_2_ail.get_websockets_close_message(e.code)
-        sys.stderr.write(error_message)
-        redis_logger.info(f'{ail_uuid}: {error_message}')
-        ail_2_ail.save_ail_server_error(ail_uuid, error_message)
-
-    except websockets.exceptions.InvalidURI as e:
-        error_message = f'Invalid AIL url: {e.uri}'
-        sys.stderr.write(error_message)
-        redis_logger.warning(f'{ail_uuid}: {error_message}')
-        ail_2_ail.save_ail_server_error(ail_uuid, error_message)
-    except ConnectionError as e:
-        error_message = str(e)
-        sys.stderr.write(error_message)
-        redis_logger.info(f'{ail_uuid}: {error_message}')
-        ail_2_ail.save_ail_server_error(ail_uuid, error_message)
-    # OSError: Multiple exceptions
     except OSError as e: # # TODO: check if we need to check if is connection error
         error_message = str(e)
         sys.stderr.write(error_message)
@@ -183,7 +163,7 @@ async def ail_to_ail_client(ail_uuid, sync_mode, api, ail_key=None, client_id=No
     except Exception as err:
         trace = traceback.format_tb(err.__traceback__)
         trace = ''.join(trace)
-        trace = str(trace)
+        trace = trace
         error_message = f'{trace}\n{str(err)}'
         sys.stderr.write(error_message)
         redis_logger.critical(f'{ail_uuid}: {error_message}')
@@ -210,10 +190,9 @@ if __name__ == '__main__':
         parser.print_help()
         sys.exit(0)
 
-    if api:
-        if api not in ['ping', 'version']:
-            parser.print_help()
-            sys.exit(0)
+    if api and api not in ['ping', 'version']:
+        parser.print_help()
+        sys.exit(0)
 
     # SELF SIGNED CERTIFICATES
     ssl_context = ssl.SSLContext(ssl.PROTOCOL_TLS_CLIENT)

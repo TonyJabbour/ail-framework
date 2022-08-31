@@ -11,37 +11,26 @@ all_screen_name = set()
 def is_screen_install():
     cmd = ['screen', '-v']
     p = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-    if p.stdout:
-        if p.stdout[:14] == b'Screen version':
-            return True
+    if p.stdout and p.stdout[:14] == b'Screen version':
+        return True
     print(p.stderr)
     return False
 
 def exist_screen(screen_name, with_sudoer=False):
-    if with_sudoer:
-        cmd_1 = ['sudo', 'screen', '-ls']
-    else:
-        cmd_1 = ['screen', '-ls']
-    cmd_2 = ['egrep', '[0-9]+.{}'.format(screen_name)]
+    cmd_1 = ['sudo', 'screen', '-ls'] if with_sudoer else ['screen', '-ls']
+    cmd_2 = ['egrep', f'[0-9]+.{screen_name}']
     p1 = subprocess.Popen(cmd_1, stdout=subprocess.PIPE)
     p2 = subprocess.Popen(cmd_2, stdin=p1.stdout, stdout=subprocess.PIPE)
     p1.stdout.close()  # Allow p1 to receive a SIGPIPE if p2 exits.
-    output = p2.communicate()[0]
-    if output:
-        return True
-    return False
+    return bool(output := p2.communicate()[0])
 
 def get_screen_pid(screen_name,  with_sudoer=False):
-    if with_sudoer:
-        cmd_1 = ['sudo', 'screen', '-ls']
-    else:
-        cmd_1 = ['screen', '-ls']
-    cmd_2 = ['egrep', '[0-9]+.{}'.format(screen_name)]
+    cmd_1 = ['sudo', 'screen', '-ls'] if with_sudoer else ['screen', '-ls']
+    cmd_2 = ['egrep', f'[0-9]+.{screen_name}']
     p1 = subprocess.Popen(cmd_1, stdout=subprocess.PIPE)
     p2 = subprocess.Popen(cmd_2, stdin=p1.stdout, stdout=subprocess.PIPE)
     p1.stdout.close()  # Allow p1 to receive a SIGPIPE if p2 exits.
-    output = p2.communicate()[0]
-    if output:
+    if output := p2.communicate()[0]:
         # extract pids with screen name
         regex_pid_screen_name = b'[0-9]+.' + screen_name.encode()
         pids = re.findall(regex_pid_screen_name, output)
@@ -80,7 +69,7 @@ def kill_screen(screen_name, with_sudoer=False):
             if p.stderr:
                 print(p.stderr)
             else:
-                print('{} killed'.format(pid))
+                print(f'{pid} killed')
         return True
     return False
 
@@ -90,10 +79,7 @@ def kill_screen(screen_name, with_sudoer=False):
 def get_screen_windows_list(screen_name, r_set=True):
     # detach screen to avoid incomplete result
     detach_screen(screen_name)
-    if r_set:
-        all_windows_name = set()
-    else:
-        all_windows_name = []
+    all_windows_name = set() if r_set else []
     cmd = ['screen', '-S', screen_name, '-Q', 'windows']
     p = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
     if p.stdout:
@@ -129,7 +115,19 @@ def get_screen_windows_id(screen_name):
 # script_location ${AIL_BIN}
 def launch_windows_script(screen_name, window_name, dir_project, script_location, script_name, script_options=''):
     venv = os.path.join(dir_project, 'AILENV/bin/python')
-    cmd = ['screen', '-S', screen_name, '-X', 'screen', '-t', window_name, 'bash', '-c', 'cd {}; ./{} {}; read x'.format(script_location,  script_name, script_options)]
+    cmd = [
+        'screen',
+        '-S',
+        screen_name,
+        '-X',
+        'screen',
+        '-t',
+        window_name,
+        'bash',
+        '-c',
+        f'cd {script_location}; ./{script_name} {script_options}; read x',
+    ]
+
     print(cmd)
     p = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
     print(p.stdout)
@@ -141,7 +139,10 @@ def launch_uniq_windows_script(screen_name, window_name, dir_project, script_loc
         if kill_previous_windows:
             kill_screen_window(screen_name, all_screen_name[window_name][0], force=True)
         else:
-            print('Error: screen {} already contain a windows with this name {}'.format(screen_name, window_name))
+            print(
+                f'Error: screen {screen_name} already contain a windows with this name {window_name}'
+            )
+
             return None
     launch_windows_script(screen_name, window_name, dir_project, script_location, script_name, script_options=script_options)
 

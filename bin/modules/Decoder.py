@@ -122,7 +122,7 @@ class Decoder(AbstractModule):
             else:
                 signal.alarm(0)
 
-                if(len(encoded_list) > 0):
+                if encoded_list:
                     content = self.decode_string(content, message, date, encoded_list, decoder['name'], decoder['encoded_min_size'])
 
 

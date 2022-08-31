@@ -34,15 +34,12 @@ class Ail_feeder_urlextract(Default_json):
         item_date = datetime.date.today().strftime("%Y/%m/%d")
         item_id = str(self.json_item['meta']['twitter:url-extracted'])
         item_id = item_id.split('//')
-        if len(item_id) > 1:
-            item_id = ''.join(item_id[1:])
-        else:
-            item_id = item_id[0]
+        item_id = ''.join(item_id[1:]) if len(item_id) > 1 else item_id[0]
         item_id = item_id.replace('/', '_')
         if len(item_id) > 215:
-            item_id = '{}{}.gz'.format(item_id[:215], str(uuid.uuid4()))
+            item_id = f'{item_id[:215]}{str(uuid.uuid4())}.gz'
         else:
-            item_id = '{}{}.gz'.format(item_id, str(uuid.uuid4()))
+            item_id = f'{item_id}{str(uuid.uuid4())}.gz'
         return os.path.join('urlextract', item_date, item_id)
 
     # # TODO:

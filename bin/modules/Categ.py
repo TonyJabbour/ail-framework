@@ -73,7 +73,7 @@ class Categ(AbstractModule):
             bname = os.path.basename(filename)
             tmp_dict[bname] = []
             with open(os.path.join(self.categ_files_dir, filename), 'r') as f:
-                patterns = [r'%s' % ( re.escape(s.strip()) ) for s in f]
+                patterns = [f'{re.escape(s.strip())}' for s in f]
                 tmp_dict[bname] = re.compile('|'.join(patterns), re.IGNORECASE)
         self.categ_words = tmp_dict.items()
 

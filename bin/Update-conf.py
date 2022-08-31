@@ -42,10 +42,10 @@ def update_config(config_file, config_file_sample, config_file_backup=False):
                     # add new section key
                     config_server.set(section, key, config_sample[section][key])
                     if not new_key_added:
-                        print_message('[{}]'.format(section), verbose)
+                        print_message(f'[{section}]', verbose)
                         new_key_added = True
                         mew_content_added = True
-                    print_message('    {} = {}'.format(key, config_sample[section][key]), verbose)
+                    print_message(f'    {key} = {config_sample[section][key]}', verbose)
 
         # new keys have been added to config file
         if mew_content_added:

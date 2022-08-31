@@ -148,21 +148,22 @@ class CListBox(ListBox):
         elif isinstance(event, MouseEvent):
             # Mouse event - rebase coordinates to Frame context.
             new_event = self._frame.rebase_event(event)
-            if event.buttons != 0:
-                if (len(self._options) > 0 and
-                        self.is_mouse_over(new_event, include_label=False)):
-                    # Use property to trigger events.
-                    self._line = min(new_event.y - self._y,
-                                     len(self._options) - 1)
-                    self.value = self._options[self._line][1]
-                    # If clicked on button <k>, kill the queue
-                    if self._x+2 <= new_event.x < self._x+4:
-                        if self.queue_name in ["running", "idle"]:
-                            kill_module(PID_NAME_DICO[int(self.value)], self.value)
-                        else:
-                            restart_module(self.value)
+            if event.buttons != 0 and (
+                len(self._options) > 0
+                and self.is_mouse_over(new_event, include_label=False)
+            ):
+                # Use property to trigger events.
+                self._line = min(new_event.y - self._y,
+                                 len(self._options) - 1)
+                self.value = self._options[self._line][1]
+                # If clicked on button <k>, kill the queue
+                if self._x+2 <= new_event.x < self._x+4:
+                    if self.queue_name in ["running", "idle"]:
+                        kill_module(PID_NAME_DICO[int(self.value)], self.value)
+                    else:
+                        restart_module(self.value)
 
-                    return
+                return
             # Ignore other mouse events.
             return event
         else:
@@ -184,12 +185,17 @@ class CLabel(Label):
         # Do the usual layout work. then recalculate exact x/w values for the
         # rendered button.
         super(Label, self).set_layout(x, y, offset, w, h)
-        self._x += max(0, (self._w - self._offset - len(self._text)) // 2) if not self.listTitle else 0
+        self._x += (
+            0
+            if self.listTitle
+            else max(0, (self._w - self._offset - len(self._text)) // 2)
+        )
+
         self._w = min(self._w, len(self._text))
 
     def update(self, frame_no):
         (colour, attr, bg) = self._frame.palette["title"]
-        colour = Screen.COLOUR_YELLOW if not self.listTitle else colour
+        colour = colour if self.listTitle else Screen.COLOUR_YELLOW
         self._frame.canvas.print_at(
             self._text, self._x, self._y, colour, attr, bg)
 
@@ -315,11 +321,16 @@ class Confirm(Frame):
     def _setValue(self):
         global current_selected_value, current_selected_queue, current_selected_action, current_selected_amount
         if current_selected_queue in ["running", "idle"]:
-            action = current_selected_action if current_selected_action == "KILL" else current_selected_action +" "+ str(current_selected_amount) + "x"
+            action = (
+                current_selected_action
+                if current_selected_action == "KILL"
+                else f"{current_selected_action} {str(current_selected_amount)}x"
+            )
+
             modulename = PID_NAME_DICO[int(current_selected_value)]
             pid = current_selected_value
         else:
-            action = current_selected_action + " " + str(current_selected_amount) + "x"
+            action = f"{current_selected_action} {str(current_selected_amount)}x"
             modulename = current_selected_value
             pid = ""
         self.label._text = self.label._text.format(action, modulename, pid)
@@ -418,7 +429,7 @@ class Show_paste(Frame):
         self.label_list = []
         self.num_label = 42 # Number of line available for displaying the paste
         for i in range(self.num_label):
-            self.label_list += [Label("THE PASTE CONTENT " + str(i))]
+            self.label_list += [Label(f"THE PASTE CONTENT {str(i)}")]
             layout.add_widget(self.label_list[i])
 
         layout2 = Layout([100])
@@ -444,7 +455,7 @@ class Show_paste(Frame):
                 return
 
             paste = Paste.Paste(COMPLETE_PASTE_PATH_PER_PID[current_selected_value])
-            old_content = paste.get_p_content()[0:4000] # Limit number of char to be displayed
+            old_content = paste.get_p_content()[:4000]
 
             #Replace unprintable char by ?
             content = ""
@@ -462,16 +473,14 @@ class Show_paste(Frame):
             for line in content.split("\n"):
                 if i > self.num_label - 2:
                     break
-                self.label_list[i]._text = str(i) + ". " + line.replace("\r","")
+                self.label_list[i]._text = f"{str(i)}. " + line.replace("\r","")
                 i += 1
 
             if i > self.num_label - 2:
                 self.label_list[i]._text = "- ALL PASTE NOT DISPLAYED -"
-                i += 1
             else:
                 self.label_list[i]._text = "- END of PASTE -"
-                i += 1
-
+            i += 1
             while i<self.num_label: #Clear out remaining lines
                 self.label_list[i]._text = ""
                 i += 1
@@ -484,7 +493,10 @@ class Show_paste(Frame):
 
         except Exception as e:
             if current_selected_value in COMPLETE_PASTE_PATH_PER_PID:
-                self.label_list[0]._text = "Error while displaying the paste: " + COMPLETE_PASTE_PATH_PER_PID[current_selected_value]
+                self.label_list[
+                    0
+                ]._text = f"Error while displaying the paste: {COMPLETE_PASTE_PATH_PER_PID[current_selected_value]}"
+
             else:
                 self.label_list[0]._text = "Error Generic exception caught"
             self.label_list[1]._text = str(e)
@@ -501,7 +513,14 @@ MANAGE MODULES AND GET INFOS
 '''
 
 def getPid(module):
-    p = Popen([command_search_pid.format(module+".py")], stdin=PIPE, stdout=PIPE, bufsize=1, shell=True)
+    p = Popen(
+        [command_search_pid.format(f"{module}.py")],
+        stdin=PIPE,
+        stdout=PIPE,
+        bufsize=1,
+        shell=True,
+    )
+
     for line in p.stdout:
         splittedLine = line.split()
         if 'python3' in splittedLine:
@@ -525,8 +544,8 @@ def cleanRedis():
                     line = line.decode('utf8')
                     splittedLine = line.split()
                     if ('python3.5' in splittedLine or 'python3' in splittedLine or 'python' in splittedLine):
-                        moduleCommand = "./"+moduleName + ".py"
-                        moduleCommand2 = moduleName + ".py"
+                        moduleCommand = f"./{moduleName}.py"
+                        moduleCommand2 = f"{moduleName}.py"
                         if(moduleCommand in splittedLine or moduleCommand2 in splittedLine):
                             flag_pid_valid = True
 
@@ -535,20 +554,40 @@ def cleanRedis():
                     #print flag_pid_valid, 'cleaning', pid, 'in', k
                     server.srem(k, pid)
                     inst_time = datetime.datetime.fromtimestamp(int(time.time()))
-                    log(([str(inst_time).split(' ')[1], moduleName, pid, "Cleared invalid pid in " + (k)], 0))
+                    log(
+                        (
+                            [
+                                str(inst_time).split(' ')[1],
+                                moduleName,
+                                pid,
+                                f"Cleared invalid pid in {k}",
+                            ],
+                            0,
+                        )
+                    )
 
-            #Error due to resize, interrupted sys call
+
             except IOError as e:
                 inst_time = datetime.datetime.fromtimestamp(int(time.time()))
                 log(([str(inst_time).split(' ')[1], " - ", " - ", "Cleaning fail due to resize."], 0))
 
 
 def restart_module(module, count=1):
-    for i in range(count):
+    for _ in range(count):
         p2 = Popen([command_restart_module.format(module, module)], stdin=PIPE, stdout=PIPE, bufsize=1, shell=True)
         time.sleep(0.2)
     inst_time = datetime.datetime.fromtimestamp(int(time.time()))
-    log(([str(inst_time).split(' ')[1], module, "?", "Restarted " + str(count) + "x"], 0))
+    log(
+        (
+            [
+                str(inst_time).split(' ')[1],
+                module,
+                "?",
+                f"Restarted {str(count)}x",
+            ],
+            0,
+        )
+    )
 
 
 def kill_module(module, pid):
@@ -559,9 +598,8 @@ def kill_module(module, pid):
         inst_time = datetime.datetime.fromtimestamp(int(time.time()))
         log(([str(inst_time).split(' ')[1], module, pid, "PID was None"], 0))
         pid = getPid(module)
-    else: #Verify that the pid is at least in redis
-        if server.exists("MODULE_"+module+"_"+str(pid)) == 0:
-            return
+    elif server.exists(f"MODULE_{module}_{str(pid)}") == 0:
+        return
 
     lastTimeKillCommand[pid] = int(time.time())
     if pid is not None:
@@ -613,8 +651,8 @@ def fetchQueueData():
     printarray_notrunning = []
     for queue, card in iter(server.hgetall("queues").items()):
         all_queue.add(queue)
-        key = "MODULE_" + queue + "_"
-        keySet = "MODULE_TYPE_" + queue
+        key = f"MODULE_{queue}_"
+        keySet = f"MODULE_TYPE_{queue}"
         array_module_type = []
 
         for moduleNum in server.smembers(keySet):
@@ -641,7 +679,20 @@ def fetchQueueData():
                     if int(card) > 0:
                         # Queue need to be killed
                         if int((datetime.datetime.now() - startTime_readable).total_seconds()) > args.treshold:
-                            log(([str(time.time()), queue, "-", "ST:"+str(timestamp)+" PT:"+str(time.time()-float(timestamp))], 0), True, show_in_board=False)
+                            log(
+                                (
+                                    [
+                                        str(time.time()),
+                                        queue,
+                                        "-",
+                                        f"ST:{str(timestamp)} PT:{str(time.time() - float(timestamp))}",
+                                    ],
+                                    0,
+                                ),
+                                True,
+                                show_in_board=False,
+                            )
+
                             try:
                                 last_kill_try = time.time() - lastTimeKillCommand[moduleNum]
                             except KeyError:
@@ -685,29 +736,36 @@ def fetchQueueData():
                         printarray_idle.append( ([" <K>  ", str(queue), str(moduleNum), str(processed_time_readable), str(path)], moduleNum) )
 
                 PID_NAME_DICO[int(moduleNum)] = str(queue)
-                #array_module_type.sort(lambda x,y: cmp(x[0][4], y[0][4]), reverse=True) #Sort by num of pastes
-        for e in array_module_type:
-            printarray_running.append(e)
-
+                            #array_module_type.sort(lambda x,y: cmp(x[0][4], y[0][4]), reverse=True) #Sort by num of pastes
+        printarray_running.extend(iter(array_module_type))
     for curr_queue in module_file_array:
         if curr_queue not in all_queue: #Module not running by default
-                printarray_notrunning.append( ([" <S>  ", curr_queue, "Not running by default"], curr_queue) )
-        else: #Module did not process anything yet
-            if len(list(server.smembers('MODULE_TYPE_'+curr_queue))) == 0:
-                if curr_queue not in no_info_modules:
-                    no_info_modules[curr_queue] = int(time.time())
-                    printarray_notrunning.append( ([" <S>  ", curr_queue, "No data"], curr_queue) )
-                else:
+            printarray_notrunning.append( ([" <S>  ", curr_queue, "Not running by default"], curr_queue) )
+        elif not list(server.smembers(f'MODULE_TYPE_{curr_queue}')):
+            if curr_queue in no_info_modules:
                     #If no info since long time, try to kill
-                    if args.autokill == 1:
-                        if int(time.time()) - no_info_modules[curr_queue] > args.treshold:
-                            kill_module(curr_queue, None)
-                            no_info_modules[curr_queue] = int(time.time())
-                        printarray_notrunning.append( ([" <S>  ", curr_queue, "Stuck or idle, restarting in " + str(abs(args.treshold - (int(time.time()) - no_info_modules[curr_queue]))) + "s"], curr_queue) )
-                    else:
-                        printarray_notrunning.append( ([" <S>  ", curr_queue, "Stuck or idle, restarting disabled"], curr_queue) )
+                if args.autokill == 1:
+                    if int(time.time()) - no_info_modules[curr_queue] > args.treshold:
+                        kill_module(curr_queue, None)
+                        no_info_modules[curr_queue] = int(time.time())
+                    printarray_notrunning.append(
+                        (
+                            [
+                                " <S>  ",
+                                curr_queue,
+                                f"Stuck or idle, restarting in {str(abs(args.treshold - (int(time.time()) - no_info_modules[curr_queue])))}s",
+                            ],
+                            curr_queue,
+                        )
+                    )
+
+                else:
+                    printarray_notrunning.append( ([" <S>  ", curr_queue, "Stuck or idle, restarting disabled"], curr_queue) )
 
 
+            else:
+                no_info_modules[curr_queue] = int(time.time())
+                printarray_notrunning.append( ([" <S>  ", curr_queue, "No data"], curr_queue) )
     printarray_running.sort(key=lambda x: x[0], reverse=False)
     printarray_idle.sort(key=lambda x: x[0], reverse=False)
     printarray_notrunning.sort(key=lambda x: x[0][1], reverse=False)
@@ -732,7 +790,7 @@ def format_string(tab, padding_row):
 
             if elem is not None and type(elem) is str:
                 if len(elem) > padding_row[ite]:
-                    text += "*" + elem[-padding_row[ite]+6:]
+                    text += f"*{elem[-padding_row[ite] + 6:]}"
                     padd_off = " "*5
                 else:
                     text += elem

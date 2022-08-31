@@ -20,7 +20,7 @@ try:
         is_hive_connected = TheHiveApi(the_hive_url, the_hive_key, cert=the_hive_verifycert)
 except:
     is_hive_connected = False
-if is_hive_connected != False:
+if is_hive_connected:
     try:
         is_hive_connected.get_alert(0)
         is_hive_connected = True
@@ -48,20 +48,19 @@ def load_tags_to_export_in_cache():
         # save solo tags in cache
         all_tags_to_export = Tag.get_list_of_solo_tags_to_export_by_type()
         if len(all_tags_to_export) > 1:
-            r_serv_cache.sadd('to_export:solo_tags:{}'.format(export_target), *all_tags_to_export)
+            r_serv_cache.sadd(f'to_export:solo_tags:{export_target}', *all_tags_to_export)
         elif all_tags_to_export:
-            r_serv_cache.sadd('to_export:solo_tags:{}'.format(export_target), all_tags_to_export[0])
-
-        # save combinaison of tags in cache
-        pass
+            r_serv_cache.sadd(
+                f'to_export:solo_tags:{export_target}', all_tags_to_export[0]
+            )
 
 def is_hive_connected(): # # TODO: REFRACTOR, put in cache (with retry)
     return is_hive_connected
 
 def get_item_hive_cases(item_id):
-    hive_case = r_serv_metadata.get('hive_cases:{}'.format(item_id))
+    hive_case = r_serv_metadata.get(f'hive_cases:{item_id}')
     if hive_case:
-        hive_case = the_hive_url + '/index.html#/case/{}/details'.format(hive_case)
+        hive_case = the_hive_url + f'/index.html#/case/{hive_case}/details'
     return hive_case
 
 

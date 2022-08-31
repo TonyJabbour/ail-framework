@@ -44,16 +44,22 @@ def verify_cryptocurrency_address(cryptocurrency_type, cryptocurrency_address):
 
 
 def get_cryptocurrency(request_dict, cryptocurrency_type):
-    # basic verification
-    res = cryptocurrency.verify_correlation_field_request(request_dict, cryptocurrency_type)
-    if res:
+    if res := cryptocurrency.verify_correlation_field_request(
+        request_dict, cryptocurrency_type
+    ):
         return res
     # cerify address
     field_name = request_dict.get(cryptocurrency_type)
-    if not verify_cryptocurrency_address(cryptocurrency_type, field_name):
-        return ( {'status': 'error', 'reason': 'Invalid Cryptocurrency address'}, 400 )
-
-    return cryptocurrency.get_correlation(request_dict, cryptocurrency_type, field_name)
+    return (
+        cryptocurrency.get_correlation(
+            request_dict, cryptocurrency_type, field_name
+        )
+        if verify_cryptocurrency_address(cryptocurrency_type, field_name)
+        else (
+            {'status': 'error', 'reason': 'Invalid Cryptocurrency address'},
+            400,
+        )
+    )
 
 
 def get_cryptocurrency_symbol(crypto_type):

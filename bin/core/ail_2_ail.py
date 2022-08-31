@@ -54,11 +54,11 @@ WEBSOCKETS_CLOSE_CODES = {
 # redis_logger.channel = 'Sync'
 
 def get_websockets_close_message(code):
-    if code in WEBSOCKETS_CLOSE_CODES:
-        msg = f'{code} {WEBSOCKETS_CLOSE_CODES[code]}'
-    else:
-        msg = f'{code} Unknow websockets code'
-    return msg
+    return (
+        f'{code} {WEBSOCKETS_CLOSE_CODES[code]}'
+        if code in WEBSOCKETS_CLOSE_CODES
+        else f'{code} Unknow websockets code'
+    )
 
 ##-- LOGS --##
 
@@ -90,27 +90,23 @@ def get_sync_server_version():
 
 def is_valid_websocket_url(websocket_url):
     regex_websocket_url = r'^(wss:\/\/)([0-9]{1,3}(?:\.[0-9]{1,3}){3}|(?=[^\/]{1,254}(?![^\/]))(?:(?=[a-zA-Z0-9-]{1,63}\.?)(?:xn--+)?[a-zA-Z0-9]+(?:-[a-zA-Z0-9]+)*\.?)+[a-zA-Z]{2,63}):([0-9]{1,5})$'
-    if re.match(regex_websocket_url, websocket_url):
-        return True
-    return False
+    return bool(re.match(regex_websocket_url, websocket_url))
 
 def is_valid_websocket_key(ail_key):
     regex_key = r'^[A-Za-z0-9-_]{56}$'
-    if re.match(regex_key, ail_key):
-        return True
-    return False
+    return bool(re.match(regex_key, ail_key))
 
 #### HANDLE CONFIG UPDATE ####
 
 def get_last_updated_sync_config():
-    epoch = r_serv_sync.get(f'ail:instance:queue:last_updated_sync_config')
+    epoch = r_serv_sync.get('ail:instance:queue:last_updated_sync_config')
     if not epoch:
         epoch = 0
     return float(epoch)
 
 def set_last_updated_sync_config():
     epoch = int(time.time())
-    r_serv_sync.set(f'ail:instance:queue:last_updated_sync_config', epoch)
+    r_serv_sync.set('ail:instance:queue:last_updated_sync_config', epoch)
     return epoch
 
 # # TODO: get connection status
@@ -156,8 +152,7 @@ def clear_server_connected_clients():
     r_cache.delete('ail_2_ail:server:all_clients')
 
 def get_server_controller_command():
-    res = r_cache.spop('ail_2_ail:server_controller:command')
-    if res:
+    if res := r_cache.spop('ail_2_ail:server_controller:command'):
         return json.loads(res)
     else:
         return None
@@ -177,14 +172,11 @@ def get_new_sync_client_id():
     for new_id in range(120000, 100000, -1):
         new_id = str(new_id)
         if not r_cache.exists(f'ail_2_ail:sync_client:{new_id}'):
-            return str(new_id)
+            return new_id
 
 def get_all_sync_clients(r_set=False):
     res = r_cache.smembers('ail_2_ail:all_sync_clients')
-    if r_set:
-        return set(res)
-    else:
-        return res
+    return set(res) if r_set else res
 
 def get_sync_client_ail_uuid(client_id):
     return r_cache.hget(f'ail_2_ail:sync_client:{client_id}', 'ail_uuid')
@@ -214,13 +206,12 @@ def get_client_id_by_ail_uuid(ail_uuid, filter_push=True):
     res = r_cache.smembers(f'ail_2_ail:ail_uuid:{ail_uuid}')
     if not filter_push:
         return res
-    else:
-        clients_id = []
-        for client_id in res:
-            client_id = int(client_id)
-            if client_id <= 100000:
-                clients_id.append(client_id)
-        return clients_id
+    clients_id = []
+    for client_id in res:
+        client_id = int(client_id)
+        if client_id <= 100000:
+            clients_id.append(client_id)
+    return clients_id
 
 def get_all_running_sync_servers():
     running_ail_servers= []
@@ -262,8 +253,7 @@ def send_command_to_manager(command, client_id=-1, ail_uuid=None):
     r_cache.sadd('ail_2_ail:client_manager:command', str_command)
 
 def refresh_ail_instance_connection(ail_uuid):
-    clients_id = get_client_id_by_ail_uuid(ail_uuid)
-    if clients_id:
+    if clients_id := get_client_id_by_ail_uuid(ail_uuid):
         client_id = clients_id[0]
     else:
         client_id = None
@@ -301,7 +291,7 @@ class AIL2AILClientManager(object):
         for new_id in range(1, 100000):
             new_id = str(new_id)
             if new_id not in self.clients:
-                return str(new_id)
+                return new_id
 
     def get_sync_client_ail_uuid(self, client_id):
         return self.clients[client_id]['ail_uuid']
@@ -310,11 +300,12 @@ class AIL2AILClientManager(object):
     #     return self.clients[client_id]['queue_uuid']
 
     def get_all_sync_clients_to_launch(self):
-        ail_instances_to_launch = []
-        for ail_uuid in get_all_ail_instance():
-            if is_ail_instance_push_enabled(ail_uuid) and is_ail_instance_linked_to_sync_queue(ail_uuid):
-                ail_instances_to_launch.append(ail_uuid)
-        return ail_instances_to_launch
+        return [
+            ail_uuid
+            for ail_uuid in get_all_ail_instance()
+            if is_ail_instance_push_enabled(ail_uuid)
+            and is_ail_instance_linked_to_sync_queue(ail_uuid)
+        ]
 
     def relaunch_all_sync_clients(self):
         delete_all_sync_clients_cache()
@@ -351,8 +342,7 @@ class AIL2AILClientManager(object):
     ## COMMANDS ##
 
     def get_manager_command(self):
-        res = r_cache.spop('ail_2_ail:client_manager:command')
-        if res:
+        if res := r_cache.spop('ail_2_ail:client_manager:command'):
             return json.loads(res)
         else:
             return None
@@ -384,16 +374,11 @@ class AIL2AILClientManager(object):
 
 # # TODO: ADD METADATA
 def get_sync_client_status(client_id):
-    dict_client = {'id': client_id}
-    dict_client['ail_uuid'] = get_sync_client_ail_uuid(client_id)
-    return dict_client
+    return {'id': client_id, 'ail_uuid': get_sync_client_ail_uuid(client_id)}
 
 def get_all_sync_client_status():
-    sync_clients = []
     all_sync_clients = r_cache.smembers('ail_2_ail:all_sync_clients')
-    for client_id in all_sync_clients:
-        sync_clients.append(get_sync_client_status(client_id))
-    return sync_clients
+    return [get_sync_client_status(client_id) for client_id in all_sync_clients]
 
 ######################
 #                    #
@@ -402,10 +387,10 @@ def get_all_sync_client_status():
 ## AIL KEYS ##
 
 def get_all_ail_instance_keys():
-    return r_serv_sync.smembers(f'ail:instance:key:all')
+    return r_serv_sync.smembers('ail:instance:key:all')
 
 def is_allowed_ail_instance_key(key):
-    return r_serv_sync.sismember(f'ail:instance:key:all', key)
+    return r_serv_sync.sismember('ail:instance:key:all', key)
 
 def get_ail_instance_key(ail_uuid):
     return r_serv_sync.hget(f'ail:instance:{ail_uuid}', 'api_key')
@@ -475,20 +460,14 @@ def change_pull_push_state(ail_uuid, pull=None, push=None):
     curr_push = is_ail_instance_push_enabled(ail_uuid)
     if pull is not None:
         # sanityze pull
-        if pull:
-            pull = True
-        else:
-            pull = False
+        pull = bool(pull)
         if curr_pull != pull:
             print('pull hset')
             r_serv_sync.hset(f'ail:instance:{ail_uuid}', 'pull', pull)
             edited = True
     if push is not None:
         # sanityze push
-        if push:
-            push = True
-        else:
-            push = False
+        push = bool(push)
         if curr_push != push:
             print('push hset')
             r_serv_sync.hset(f'ail:instance:{ail_uuid}', 'push', push)
@@ -509,9 +488,7 @@ def get_ail_server_error(ail_uuid):
 
 # # TODO: HIDE ADD GLOBAL FILTER (ON BOTH SIDE)
 def get_ail_instance_metadata(ail_uuid, client_sync_mode=False, server_sync_mode=False, sync_queues=False):
-    dict_meta = {}
-    dict_meta['uuid'] = ail_uuid
-    dict_meta['url'] = get_ail_instance_url(ail_uuid)
+    dict_meta = {'uuid': ail_uuid, 'url': get_ail_instance_url(ail_uuid)}
     dict_meta['description'] = get_ail_instance_description(ail_uuid)
     dict_meta['pull'] = is_ail_instance_pull_enabled(ail_uuid)
     dict_meta['push'] = is_ail_instance_push_enabled(ail_uuid)
@@ -537,10 +514,10 @@ def get_ail_instance_metadata(ail_uuid, client_sync_mode=False, server_sync_mode
     return dict_meta
 
 def get_all_ail_instances_metadata():
-    l_servers = []
-    for ail_uuid in get_all_ail_instance():
-        l_servers.append(get_ail_instance_metadata(ail_uuid, sync_queues=True))
-    return l_servers
+    return [
+        get_ail_instance_metadata(ail_uuid, sync_queues=True)
+        for ail_uuid in get_all_ail_instance()
+    ]
 
 def get_ail_instances_metadata(l_ail_servers, sync_queues=True, client_sync_mode=False, server_sync_mode=False):
     l_servers = []
@@ -640,32 +617,21 @@ def _get_remote_ail_server_response(ail_uuid, api_request):
     if process.returncode == 0:
         # Scrapy-Splash ERRORS
         if process.stderr:
-            stderr = process.stderr.read().decode()
-            if stderr:
+            if stderr := process.stderr.read().decode():
                 print(f'stderr: {stderr}')
 
         if process.stdout:
-            output = process.stdout.read().decode()
-            #print(output)
-            if output:
+            if output := process.stdout.read().decode():
                 try:
-                    message = json.loads(output)
-                    return message
+                    return json.loads(output)
                 except Exception as e:
                     print(e)
                     error = f'Error: {e}'
                     save_ail_server_error(ail_uuid, error)
                     return
-    # ERROR
     else:
-        if process.stderr:
-            stderr = process.stderr.read().decode()
-        else:
-            stderr = ''
-        if process.stdout:
-            stdout = process.stdout.read().decode()
-        else:
-            stdout =''
+        stderr = process.stderr.read().decode() if process.stderr else ''
+        stdout = process.stdout.read().decode() if process.stdout else ''
         if stderr or stdout:
             error = f'-stderr-\n{stderr}\n-stdout-\n{stdout}'
             print(error)
@@ -673,10 +639,8 @@ def _get_remote_ail_server_response(ail_uuid, api_request):
             return
 
 def get_remote_ail_server_version(ail_uuid):
-    response = _get_remote_ail_server_response(ail_uuid, 'version')
-    if response:
-        version = response.get('version')
-        if version:
+    if response := _get_remote_ail_server_response(ail_uuid, 'version'):
+        if version := response.get('version'):
             version = float(version)
             if version >= 0.1:
                 set_ail_server_version(ail_uuid, version)
@@ -684,8 +648,7 @@ def get_remote_ail_server_version(ail_uuid):
 
 # # TODO: CATCH WEBSOCKETS RESPONSE CODE
 def ping_remote_ail_server(ail_uuid):
-    response = _get_remote_ail_server_response(ail_uuid, 'ping')
-    if response:
+    if response := _get_remote_ail_server_response(ail_uuid, 'ping'):
         response = response.get('message', False)
         pong = response == 'pong'
     else:
@@ -754,8 +717,7 @@ def api_launch_sync_client(json_dict):
     if not exists_ail_instance(ail_uuid):
         return {"status": "error", "reason": "AIL server not found"}, 404
 
-    clients_id = get_client_id_by_ail_uuid(ail_uuid)
-    if clients_id:
+    if clients_id := get_client_id_by_ail_uuid(ail_uuid):
         return {"status": "error", "reason": "Client already connected"}, 400
 
     res = send_command_to_manager('launch', ail_uuid=ail_uuid)
@@ -784,14 +746,8 @@ def api_create_ail_instance(json_dict):
     if exists_ail_instance(ail_uuid):
         return {"status": "error", "reason": "AIL uuid already exists"}, 400
 
-    if json_dict.get('pull'):
-        pull = True
-    else:
-        pull = False
-    if json_dict.get('push'):
-        push = True
-    else:
-        push = False
+    pull = bool(json_dict.get('pull'))
+    push = bool(json_dict.get('push'))
     description = json_dict.get('description')
 
     ail_url = json_dict.get('url').replace(' ', '')
@@ -819,29 +775,21 @@ def api_edit_ail_instance(json_dict):
     pull = json_dict.get('pull')
     push = json_dict.get('push')
     if pull is not None:
-        if pull:
-            pull = True
-        else:
-            pull = False
+        pull = bool(pull)
     if push is not None:
-        if push:
-            push = True
-        else:
-            push = False
+        push = bool(push)
     edit_ail_instance_pull_push(ail_uuid, pull, push)
 
     description = json_dict.get('description')
     edit_ail_instance_description(ail_uuid, description)
 
-    ail_url = json_dict.get('url')
-    if ail_url:
+    if ail_url := json_dict.get('url'):
         ail_url = ail_url.replace(' ', '')
         if not is_valid_websocket_url(ail_url):
             return {"status": "error", "reason": "Invalid websocket url"}, 400
         edit_ail_instance_url(ail_uuid, ail_url)
 
-    ail_key = json_dict.get('key')
-    if ail_key:
+    if ail_key := json_dict.get('key'):
         ail_key = ail_key.replace(' ', '')
         if not is_valid_websocket_key(ail_key):
             return {"status": "error", "reason": "Invalid websocket key"}, 400
@@ -898,9 +846,7 @@ def get_sync_queue_max_size(queue_uuid):
 
 # # TODO: ADD FILTER
 def get_sync_queue_metadata(queue_uuid):
-    dict_meta = {}
-    dict_meta['uuid'] = queue_uuid
-    dict_meta['name'] = get_sync_queue_name(queue_uuid)
+    dict_meta = {'uuid': queue_uuid, 'name': get_sync_queue_name(queue_uuid)}
     dict_meta['description'] = get_sync_queue_description(queue_uuid)
     dict_meta['max_size'] = get_sync_queue_max_size(queue_uuid)
     dict_meta['tags'] = get_sync_queue_filter(queue_uuid)
@@ -911,26 +857,20 @@ def get_sync_queue_metadata(queue_uuid):
     return dict_meta
 
 def get_all_queues_metadata():
-    l_queues = []
-    for queue_uuid in get_all_sync_queue():
-        l_queues.append(get_sync_queue_metadata(queue_uuid))
-    return l_queues
+    return [
+        get_sync_queue_metadata(queue_uuid)
+        for queue_uuid in get_all_sync_queue()
+    ]
 
 def get_queues_metadata(l_queues_uuid):
-    l_queues = []
-    for queue_uuid in l_queues_uuid:
-        l_queues.append(get_sync_queue_metadata(queue_uuid))
-    return l_queues
+    return [get_sync_queue_metadata(queue_uuid) for queue_uuid in l_queues_uuid]
 
 #####################################################
 def get_all_sync_queue_dict():
     dict_sync_queues = {}
     for queue_uuid in get_all_sync_queue():
         if is_queue_used_by_ail_instance(queue_uuid):
-            dict_queue = {}
-            dict_queue['filter'] = get_sync_queue_filter(queue_uuid)
-
-            dict_queue['ail_instances'] = [] ############ USE DICT ?????????
+            dict_queue = {'filter': get_sync_queue_filter(queue_uuid), 'ail_instances': []}
             for ail_uuid in get_sync_queue_all_ail_instance(queue_uuid):
                 dict_ail = {'ail_uuid': ail_uuid,
                             'pull': is_ail_instance_pull_enabled(ail_uuid),
@@ -1039,7 +979,7 @@ def api_create_sync_queue(json_dict):
         max_size = int(max_size)
     except ValueError:
         return {"status": "error", "reason": "Invalid queue size value"}, 400
-    if not max_size > 0:
+    if max_size <= 0:
         return {"status": "error", "reason": "Invalid queue size value"}, 400
 
     queue_uuid = create_sync_queue(queue_name, tags=tags, description=description,
@@ -1058,25 +998,22 @@ def api_edit_sync_queue(json_dict):
     if description is not None:
         edit_sync_queue_description(queue_uuid, description)
 
-    queue_name = json_dict.get('name')
-    if queue_name:
+    if queue_name := json_dict.get('name'):
         queue_name = escape(queue_name)
         edit_sync_queue_name(queue_uuid, queue_name)
 
-    tags = json_dict.get('tags')
-    if tags:
+    if tags := json_dict.get('tags'):
         # FIXME: add custom tags
         # if not Tag.are_enabled_tags(tags):
         #     return {"status": "error", "reason": "Invalid/Disabled tags"}, 400
         edit_sync_queue_filter_tags(queue_uuid, tags)
 
-    max_size = json_dict.get('max_size')
-    if max_size:
+    if max_size := json_dict.get('max_size'):
         try:
             max_size = int(max_size)
         except ValueError:
             return {"status": "error", "reason": "Invalid queue size value"}, 400
-        if not max_size > 0:
+        if max_size <= 0:
             return {"status": "error", "reason": "Invalid queue size value"}, 400
         edit_sync_queue_max_size(queue_uuid, max_size)
 
@@ -1136,8 +1073,9 @@ def api_unregister_ail_to_sync_queue(json_dict):
 
 def get_sync_queue_object_and_queue_uuid(ail_uuid, push=True):
     for queue_uuid in get_ail_instance_all_sync_queue(ail_uuid):
-        obj_dict = get_sync_queue_object_by_queue_uuid(queue_uuid, ail_uuid, push=push)
-        if obj_dict:
+        if obj_dict := get_sync_queue_object_by_queue_uuid(
+            queue_uuid, ail_uuid, push=push
+        ):
             return obj_dict, queue_uuid
     return None, None
 
@@ -1146,12 +1084,10 @@ def get_sync_queue_object(ail_uuid, push=True):
     return obj_dict
 
 def get_sync_queue_object_by_queue_uuid(queue_uuid, ail_uuid, push=True):
-    if push:
-        sync_mode = 'push'
-    else:
-        sync_mode = 'pull'
-    obj_dict = r_serv_sync.lpop(f'sync:queue:{sync_mode}:{queue_uuid}:{ail_uuid}')
-    if obj_dict:
+    sync_mode = 'push' if push else 'pull'
+    if obj_dict := r_serv_sync.lpop(
+        f'sync:queue:{sync_mode}:{queue_uuid}:{ail_uuid}'
+    ):
         obj_dict = json.loads(obj_dict)
         # # REVIEW: # TODO: create by obj type
         return Item(obj_dict['id'])
@@ -1171,10 +1107,7 @@ def add_object_to_sync_queue(queue_uuid, ail_uuid, obj_dict, push=True, pull=Tru
 def resend_object_to_sync_queue(ail_uuid, queue_uuid, Obj, push=True):
     if queue_uuid is not None and Obj is not None:
         obj_dict = Obj.get_default_meta()
-        if push:
-            pull = False
-        else:
-            pull = True
+        pull = not push
         add_object_to_sync_queue(queue_uuid, ail_uuid, obj_dict, push=push, pull=pull)
 
 # # TODO: # REVIEW: USE CACHE ????? USE QUEUE FACTORY ?????
@@ -1200,12 +1133,14 @@ def is_valid_ail_exchange_format(ail_stream):
     pass
 
 def create_ail_stream(Object):
-    ail_stream = {'format': 'ail',
-                  'version': 1,
-                  'type': Object.get_type()}
+    ail_stream = {
+        'format': 'ail',
+        'version': 1,
+        'type': Object.get_type(),
+        'meta': {'ail:mime-type': 'text/plain'},
+    }
 
-    # OBJECT META
-    ail_stream['meta'] = {'ail:mime-type': 'text/plain'}
+
     ail_stream['meta']['compress'] = 'gzip'
     ail_stream['meta']['encoding'] = 'base64'
     ail_stream['meta']['ail:id'] = Object.get_id()

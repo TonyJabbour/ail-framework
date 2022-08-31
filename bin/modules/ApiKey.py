@@ -73,10 +73,10 @@ class ApiKey(AbstractModule):
                 print(f'found AWS key: {to_print}')
                 self.redis_logger.warning(f'{to_print}Checked {len(aws_access_key)} found AWS Key;{item.get_id()}')
                 if aws_secret_key:
-                    print(f'found AWS secret key')
+                    print('found AWS secret key')
                     self.redis_logger.warning(f'{to_print}Checked {len(aws_secret_key)} found AWS secret Key;{item.get_id()}')
 
-                msg = 'infoleak:automatic-detection="aws-key";{}'.format(item.get_id())
+                msg = f'infoleak:automatic-detection="aws-key";{item.get_id()}'
                 self.send_message_to_queue(msg, 'Tags')
 
             # Tags

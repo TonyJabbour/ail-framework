@@ -93,10 +93,7 @@ class Investigation(object):
         self.uuid = investigation_uuid
 
     def get_uuid(self, separator=False):
-        if separator:
-            return uuid.UUID(hex=self.uuid, version=4)
-        else:
-            return self.uuid
+        return uuid.UUID(hex=self.uuid, version=4) if separator else self.uuid
 
     # # TODO: Replace by title ??????
     def get_name(self):

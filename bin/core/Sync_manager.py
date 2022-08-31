@@ -15,8 +15,7 @@ if __name__ == '__main__':
     Client_Manager = ail_2_ail.AIL2AILClientManager()
 
     while True:
-        command = Client_Manager.get_manager_command()
-        if command:
+        if command := Client_Manager.get_manager_command():
             Client_Manager.execute_manager_command(command)
         else:
             time.sleep(5)

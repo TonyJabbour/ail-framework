@@ -72,7 +72,7 @@ class CreditCards(AbstractModule):
 
             #pprint.pprint(creditcard_set)
             to_print = f'CreditCard;{item.get_source()};{item.get_date()};{item.get_basename()};'
-            if (len(creditcard_set) > 0):
+            if creditcard_set:
                 self.redis_logger.warning(f'{to_print}Checked {len(creditcard_set)} valid number(s);{item.get_id()}')
 
                 #Send to duplicate

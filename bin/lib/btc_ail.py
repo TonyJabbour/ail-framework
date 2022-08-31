@@ -20,7 +20,10 @@ def get_bitcoin_info(bitcoin_address, nb_transaction=50):
     set_btc_out = set()
     req = None
     try:
-        req = requests.get('{}/{}?limit={}'.format(blockchain_all, bitcoin_address, nb_transaction))
+        req = requests.get(
+            f'{blockchain_all}/{bitcoin_address}?limit={nb_transaction}'
+        )
+
         jreq = req.json()
     except Exception as e:
         print(e)
@@ -34,13 +37,14 @@ def get_bitcoin_info(bitcoin_address, nb_transaction=50):
 
     for transaction in jreq['txs']:
         for input in transaction['inputs']:
-            if 'addr' in input['prev_out']:
-                if input['prev_out']['addr'] != bitcoin_address:
-                    set_btc_in.add(input['prev_out']['addr'])
+            if (
+                'addr' in input['prev_out']
+                and input['prev_out']['addr'] != bitcoin_address
+            ):
+                set_btc_in.add(input['prev_out']['addr'])
         for output in transaction['out']:
-            if 'addr' in output:
-                if output['addr'] != bitcoin_address:
-                    set_btc_out.add(output['addr'])
+            if 'addr' in output and output['addr'] != bitcoin_address:
+                set_btc_out.add(output['addr'])
 
     dict_btc['btc_in'] = filter_btc_seen(set_btc_in)
     dict_btc['btc_out'] = filter_btc_seen(set_btc_out)
@@ -48,8 +52,10 @@ def get_bitcoin_info(bitcoin_address, nb_transaction=50):
 
 # filter btc seen in ail
 def filter_btc_seen(btc_addr_set):
-    list_seen_btc = []
-    for btc_addr in btc_addr_set:
-        if Cryptocurrency.cryptocurrency._exist_corelation_field('bitcoin', btc_addr):
-            list_seen_btc.append(btc_addr)
-    return list_seen_btc
+    return [
+        btc_addr
+        for btc_addr in btc_addr_set
+        if Cryptocurrency.cryptocurrency._exist_corelation_field(
+            'bitcoin', btc_addr
+        )
+    ]

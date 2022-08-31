@@ -49,9 +49,8 @@ class Ail_feeder_telegram(Default_json):
         username = None
         if self.json_item['meta'].get('user'):
             username = str(self.json_item['meta']['user'])
-        else:
-            if self.json_item['meta'].get('channel'):
-                username = str(self.json_item['meta']['channel']['username'])
+        elif self.json_item['meta'].get('channel'):
+            username = str(self.json_item['meta']['channel']['username'])
         if username:
             #print(username)
             item_date = item_basic.get_item_date(item_id)

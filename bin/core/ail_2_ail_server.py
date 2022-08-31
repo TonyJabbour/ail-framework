@@ -54,26 +54,20 @@ def is_valid_uuid_v4(UUID):
         return False
 
 def unpack_path(path):
-    dict_path = {}
     path = path.split('/')
     if len(path) < 3:
         raise Exception('Invalid url path')
     if not len(path[-1]):
         path = path[:-1]
 
-    dict_path['sync_mode'] = path[1]
-    dict_path['ail_uuid'] = path[-1]
-    dict_path['api'] = path[2:-1]
-
-    return dict_path
+    return {'sync_mode': path[1], 'ail_uuid': path[-1], 'api': path[2:-1]}
 
 # # # # # # #
 
 # # TODO: ADD more commands
 async def server_controller():
     while True:
-        command_dict = ail_2_ail.get_server_controller_command()
-        if command_dict:
+        if command_dict := ail_2_ail.get_server_controller_command():
             command = command_dict.get('command')
             if command == 'kill':
                 ail_uuid = command_dict.get('ail_uuid')
@@ -94,7 +88,7 @@ async def register(websocket):
     redis_logger.info(f'Client Connected: {ail_uuid} {remote_address}')
     print(f'Client Connected: {ail_uuid} {remote_address}')
 
-    if not ail_uuid in CONNECTED_CLIENTS:
+    if ail_uuid not in CONNECTED_CLIENTS:
         CONNECTED_CLIENTS[ail_uuid] = set()
     CONNECTED_CLIENTS[ail_uuid].add(websocket)
     ail_2_ail.add_server_connected_client(ail_uuid, sync_mode)
@@ -259,7 +253,7 @@ class AIL_2_AIL_Protocol(websockets.WebSocketServerProtocol):
             return http.HTTPStatus.UNAUTHORIZED, [], b"Invalid token\n"
 
 
-        if not api_key != ail_2_ail.get_ail_instance_key(api_key):
+        if api_key == ail_2_ail.get_ail_instance_key(api_key):
             redis_logger.warning(f'Invalid token: {self.remote_address} {ail_uuid}')
             print(f'Invalid token: {self.remote_address} {ail_uuid}')
             return http.HTTPStatus.UNAUTHORIZED, [], b"Invalid token\n"
@@ -268,7 +262,7 @@ class AIL_2_AIL_Protocol(websockets.WebSocketServerProtocol):
         self.ail_uuid = ail_uuid
         self.sync_mode = dict_path['sync_mode']
 
-        if self.sync_mode == 'pull' or self.sync_mode == 'push':
+        if self.sync_mode in ['pull', 'push']:
 
             # QUEUE UUID
             # if dict_path['queue_uuid']:
@@ -292,11 +286,7 @@ class AIL_2_AIL_Protocol(websockets.WebSocketServerProtocol):
                 print(f'SYNC mode disabled: {self.remote_address} {ail_uuid} {sync_mode}')
                 return http.HTTPStatus.FORBIDDEN, [], b"SYNC mode disabled\n"
 
-        # # TODO: CHECK API
-        elif self.sync_mode == 'api':
-            pass
-
-        else:
+        elif self.sync_mode != 'api':
             print(f'Invalid path: {self.remote_address}')
             redis_logger.info(f'Invalid path: {self.remote_address}')
             return http.HTTPStatus.BAD_REQUEST, [], b"Invalid path\n"

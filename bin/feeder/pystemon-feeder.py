@@ -64,18 +64,18 @@ while True:
         print(item_id)
         full_item_path = os.path.join(pystemonpath, item_id)
         if not os.path.isfile(full_item_path):
-            print('Error: {}, file not found'.format(full_item_path))
+            print(f'Error: {full_item_path}, file not found')
             sleep_inc = 1
             continue
 
         with open(full_item_path, 'rb') as f: #.read()
             messagedata = f.read()
         path_to_send = os.path.join(pastes_directory, item_id)
-        path_to_send = 'pystemon>>' + path_to_send
+        path_to_send = f'pystemon>>{path_to_send}'
 
         s = b' '.join( [ topic.encode(), path_to_send.encode(), base64.b64encode(messagedata) ] )
         socket.send(s)
-        sleep_inc = sleep_inc-0.01 if sleep_inc-0.01 > 0 else 0
+        sleep_inc = sleep_inc-0.01 if sleep_inc > 0 + 0.01 else 0
     except IOError as e:
         # file not found, could be a buffering issue -> increase sleeping time
         print('IOError: Increasing sleep time')

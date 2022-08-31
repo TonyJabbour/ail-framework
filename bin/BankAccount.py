@@ -40,7 +40,7 @@ def iban_number(iban):
 
 def is_valid_iban(iban):
     iban_numb = iban_number(iban)
-    iban_numb_check = iban_number(iban[:2] + '00' + iban[4:])
+    iban_numb_check = iban_number(f'{iban[:2]}00{iban[4:]}')
     check_digit = '{:0>2}'.format(98 - (int(iban_numb_check) % 97))
     if check_digit == iban[2:4] and int(iban_numb) % 97 == 1:
         # valid iban
@@ -57,17 +57,17 @@ def check_all_iban(l_iban, obj_id):
         res = iban_regex_verify.findall(iban)
         date = datetime.datetime.now().strftime("%Y%m")
         if res:
-            print('checking '+iban)
+            print(f'checking {iban}')
             if is_valid_iban(iban):
                 print('------')
                 nb_valid_iban = nb_valid_iban + 1
-                server_statistics.hincrby('iban_by_country:'+date, iban[0:2], 1)
+                server_statistics.hincrby(f'iban_by_country:{date}', iban[:2], 1)
 
-    if(nb_valid_iban > 0):
-        to_print = 'Iban;{};{};{};'.format(Item.get_source(obj_id), Item.get_item_date(obj_id), Item.get_basename(obj_id))
-        publisher.warning('{}Checked found {} IBAN;{}'.format(
-            to_print, nb_valid_iban, obj_id))
-        msg = 'infoleak:automatic-detection="iban";{}'.format(obj_id)
+    if (nb_valid_iban > 0):
+        to_print = f'Iban;{Item.get_source(obj_id)};{Item.get_item_date(obj_id)};{Item.get_basename(obj_id)};'
+
+        publisher.warning(f'{to_print}Checked found {nb_valid_iban} IBAN;{obj_id}')
+        msg = f'infoleak:automatic-detection="iban";{obj_id}'
         p.populate_set_out(msg, 'Tags')
 
         #Send to duplicate

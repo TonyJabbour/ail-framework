@@ -46,10 +46,10 @@ config_loader = None
 ## -- ##
 
 def is_mxdomain_in_cache(mxdomain):
-    return r_serv_cache.exists('mxdomain:{}'.format(mxdomain))
+    return r_serv_cache.exists(f'mxdomain:{mxdomain}')
 
 def save_mxdomain_in_cache(mxdomain):
-    r_serv_cache.setex('mxdomain:{}'.format(mxdomain), 1, datetime.timedelta(days=1))
+    r_serv_cache.setex(f'mxdomain:{mxdomain}', 1, datetime.timedelta(days=1))
 
 def check_mx_record(set_mxdomains, dns_server):
     """Check if emails MX domains are responding.
@@ -74,19 +74,11 @@ def check_mx_record(set_mxdomains, dns_server):
 
             # DNS resolution
             try:
-                answers = resolver.query(mxdomain, rdtype=dns.rdatatype.MX)
-                if answers:
+                if answers := resolver.query(
+                    mxdomain, rdtype=dns.rdatatype.MX
+                ):
                     save_mxdomain_in_cache(mxdomain)
                     valid_mxdomain.append(mxdomain)
-                    # DEBUG
-                    # print('---')
-                    # print(answers.response)
-                    # print(answers.qname)
-                    # print(answers.rdtype)
-                    # print(answers.rdclass)
-                    # print(answers.nameserver)
-                    # print()
-
             except dns.resolver.NoNameservers:
                 publisher.debug('NoNameserver, No non-broken nameservers are available to answer the query.')
                 print('NoNameserver, No non-broken nameservers are available to answer the query.')
@@ -138,7 +130,7 @@ if __name__ == "__main__":
 
     email_regex = "[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,6}"
 
-    redis_key = 'mail_extracted:{}'.format(str(uuid.uuid4()))
+    redis_key = f'mail_extracted:{str(uuid.uuid4())}'
 
     while True:
         message = p.get_from_set()
@@ -157,7 +149,7 @@ if __name__ == "__main__":
                 if proc.is_alive():
                     proc.terminate()
                     p.incr_module_timeout_statistic()
-                    err_mess = "Mails: processing timeout: {}".format(item_id)
+                    err_mess = f"Mails: processing timeout: {item_id}"
                     print(err_mess)
                     publisher.info(err_mess)
                     continue
@@ -175,12 +167,12 @@ if __name__ == "__main__":
             dict_mxdomains_email = {}
             for email in all_emails:
                 mxdomain = email.split('@')[1].lower()
-                if not mxdomain in dict_mxdomains_email:
+                if mxdomain not in dict_mxdomains_email:
                     dict_mxdomains_email[mxdomain] = []
                     set_mxdomains.add(mxdomain)
                 dict_mxdomains_email[mxdomain].append(email)
 
-                ## TODO: add MAIL trackers
+                            ## TODO: add MAIL trackers
 
             valid_mx = check_mx_record(set_mxdomains, dns_server)
 
@@ -191,7 +183,7 @@ if __name__ == "__main__":
                 num_valid_email += len(dict_mxdomains_email[domain_mx])
 
                 for email in dict_mxdomains_email[domain_mx]:
-                    msg = 'mail;{};{};{}'.format(1, email, item_date)
+                    msg = f'mail;1;{email};{item_date}'
                     p.populate_set_out(msg, 'ModuleStats')
 
                     # Create country stats
@@ -201,17 +193,18 @@ if __name__ == "__main__":
                         tld = tld.decode()
                     except:
                         pass
-                    server_statistics.hincrby('mail_by_tld:{}'.format(item_date), tld, 1)
+                    server_statistics.hincrby(f'mail_by_tld:{item_date}', tld, 1)
 
-            msg = 'Mails;{};{};{};Checked {} e-mail(s);{}'.format(Item.get_source(item_id), item_date, Item.get_item_basename(item_id), num_valid_email, item_id)
+            msg = f'Mails;{Item.get_source(item_id)};{item_date};{Item.get_item_basename(item_id)};Checked {num_valid_email} e-mail(s);{item_id}'
+
 
             if num_valid_email > mail_threshold:
-                print('{}    Checked {} e-mail(s)'.format(item_id, num_valid_email))
+                print(f'{item_id}    Checked {num_valid_email} e-mail(s)')
                 publisher.warning(msg)
                 #Send to duplicate
                 p.populate_set_out(item_id, 'Duplicate')
                 #tags
-                msg = 'infoleak:automatic-detection="mail";{}'.format(item_id)
+                msg = f'infoleak:automatic-detection="mail";{item_id}'
                 p.populate_set_out(msg, 'Tags')
             else:
                 publisher.info(msg)
